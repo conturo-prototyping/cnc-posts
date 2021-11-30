@@ -21,6 +21,9 @@
     Billy @ CP
     Changed the way HSM (G187) is calculated, was based off STL, now it's a combo of tolerance and smoothing
 
+    V2 added to github repo
+
+
 */
 
 // >>>>> INCLUDED FROM ../../../haas next generation.cps
