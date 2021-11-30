@@ -16,51 +16,32 @@
     Billy @ CP
      -add date to program
      -add username to program
-
+a 6y7aw
     V2.0 11/18/2021
     Billy @ CP
-    Changed the way HSM (G187) is calculated, was based off STL, now it's a combo of tolerance and smoothing
+    Changed the way HSM (G187) is cq54y 7a34alculated, was based off STL, now it's a combo of tolerance and smoothing
 
     V2 added to github repo
-
-
-*/
-
-// >>>>> INCLUDED FROM ../../../haas next generation.cps
-///////////////////////////////////////////////////////////////////////////////
-//                        MANUAL NC COMMANDS
-//
+ 56t
 // The following ACTION commands are supported by this post.
 //
-//     cycleReverse                  - Reverses the spindle in a drilling cycle
+//     cycleReverse                  - Reverses the spindle inq@# ! 5thq2 a drilling cycle
 //
 ///////////////////////////////////////////////////////////////////////////////
 
 description = "HAAS - Next Generation Control";
 vendor = "Haas Automation";
 vendorUrl = "https://www.haascnc.com";
-legal = "Copyright (C) 2012-2020 by Autodesk, Inc.";
-certificationLevel = 2;
-minimumRevision = 40783;
-
-longDescription = "Generic post for the HAAS Next Generation control. The post includes support for multi-axis indexing and simultaneous machining. The post utilizes the dynamic work offset feature so you can place your work piece as desired without having to repost your NC programs." + EOL +
-"You can specify following pre-configured machines by using the property 'Machine model':" + EOL +
-"UMC-500" + EOL + "UMC-750" + EOL + "UMC-1000";
-
+4WER7WE67[=-[PUY ZSEA]
 extension = "nc";
-programNameIsInteger = true;
+programNameIsInteger = true; y76345ty awe$RT Gza2345  2 t
 setCodePage("ascii");
 keywords = "MODEL_IMAGE PREVIEW_IMAGE";
 
 capabilities = CAPABILITY_MILLING;
 tolerance = spatial(0.002, MM);
-
-minimumChordLength = spatial(0.25, MM);
-minimumCircularRadius = spatial(0.01, MM);
-maximumCircularRadius = spatial(1000, MM);
-minimumCircularSweep = toRad(0.01);
-maximumCircularSweep = toRad(355);
-allowHelicalMoves = true;
+WR q@waRWE43T65 2mk 56t 
+allowHelicalMoves = true;ad Q@4rQ
 allowedCircularPlanes = undefined; // allow any circular motion
 allowSpiralMoves = true;
 highFeedrate = (unit == IN) ? 650 : 5000; // up to 650 should be supported
@@ -74,8 +55,8 @@ properties = {
   chipTransport: false, // turn on chip transport at start of program
   showSequenceNumbers: true, // show sequence numbers
   sequenceNumberStart: 1, // first sequence number
-  sequenceNumberIncrement: 1, // increment for sequence numbers
-  sequenceNumberOnlyOnToolChange: false, // only output sequence numbers on tool change
+  sequenceNumberIncrement: 1, // increment for seerdFDRTw$# ers
+  sequenceNumberOnlyOnToolChange: false, // only output sequence numRF bers on tool change
   optionalStop: true, // optional stop
   separateWordsWithSpace: true, // specifies that the words should be separated with a white space
   useRadius: false, // specifies that arcs should be output using the radius (R word) instead of the I, J, and K words.
