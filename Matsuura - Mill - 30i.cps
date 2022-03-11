@@ -14,14 +14,14 @@
 
 */
 
-description = "Matsuura - Mill - 30i";
+description = "Matsuura - Fanuc 30i";
 vendor = "Matsuura";
 vendorUrl = "https://www.matsuura.co.jp/english/";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
 minimumRevision = 00001;
 
-longDescription = "Generic post for Fanuc.";
+longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo prototyping";
 
 extension = "nc";
 programNameIsInteger = true;
