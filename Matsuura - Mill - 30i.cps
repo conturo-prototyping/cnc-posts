@@ -2,20 +2,24 @@
   Copyright (C) 2012-2021 by Autodesk, Inc.
   All rights reserved.
 
-  FANUC post processor configuration.
+  
 
-  $Revision: 43564 21df9e93956e7164e5f6e81ec3f3fd72618f6775 $
+  $Revision: 00001 21df9e93956e7164e5f6e81ec3f3fd72618f6775 $
   $Date: 2021-12-13 22:54:16 $
 
-  FORKID {04622D27-72F0-45d4-85FB-DB346FD1AE22}
+  Matsuura Fanuc 30i post processor configuration
+  Billy Conturo @ Conturo Prototyping 2022-10-03
+    -gettin the party started in gethub
+
+
 */
 
-description = "FANUC";
-vendor = "Fanuc";
-vendorUrl = "http://www.fanuc.com";
-legal = "Copyright (C) 2012-2021 by Autodesk, Inc.";
+description = "Matsuura - Mill - 30i";
+vendor = "Matsuura";
+vendorUrl = "https://www.matsuura.co.jp/english/";
+legal = "Conturo Prototyping";
 certificationLevel = 2;
-minimumRevision = 45793;
+minimumRevision = 00001;
 
 longDescription = "Generic post for Fanuc.";
 
