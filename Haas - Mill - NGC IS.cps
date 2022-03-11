@@ -17,6 +17,11 @@
     03/10/2022
     Billy @ CP
       -added user and date to program
+      -updated hsm calculaton a little bit
+      -changed program title to be the title of the setup in fusion instead of comment
+      -started to figure out how to print stock size at the top of the program
+      
+
 
 
 */
@@ -1070,10 +1075,16 @@ function onOpen() {
       error(localize("Program number is out of range."));
       return;
     }
+    // program number plus name (programComment or jobdescription)
+    var jobdescription = (getGlobalParameter("job-description"))
+    //var stockwidth = (getProperty("job_stockfixedx"))
     writeln(
       "O" + oFormat.format(programId) +
-      conditional(programComment, " " + formatComment(programComment.substr(0, maximumLineLength - 2 - ("O" + oFormat.format(programId)).length - 1)))
+      conditional(jobdescription, " " + formatComment(jobdescription.substr(0, maximumLineLength - 2 - ("O" + oFormat.format(programId)).length - 1)))
     );
+    //writeln(
+    //  formatComment(stockwidth)
+    //)
     lastSubprogram = (initialSubprogramNumber - 1);
   } else {
     error(localize("Program name has not been specified."));
@@ -1121,8 +1132,7 @@ function onOpen() {
 		  writeComment("Username: " + usernameprint);
 		  }
 		  
-// write date	
-
+// write date
 	      if (hasGlobalParameter("generated-at")) {
     var datetime = getGlobalParameter("generated-at");
 		  writeComment("Program Posted: " + datetime);
@@ -1357,59 +1367,7 @@ function disableLengthCompensation(force, message) {
   }
 }
 
-//Haas HSM control options
-//P - Controls the smoothness level, P1(rough), P2(medium), or P3(finish). Temporarily overrides Setting 191. This will round corners in an effort keep the speed from decreasing.
-//E - Sets the max corner rounding value.Temporarily overrides Setting 85.
-//Setting 191 sets the default smoothness to the user specified ROUGH, MEDIUM, or FINISH when G187 is not active.The Medium setting is the factory default setting.
 
-if (hasParameter("operation:strategy") && ((getParameter("operation:strategy")) !== ("drill"))) {
-  var smoothingmultiplyer;
-  var accelunit;
-  var smoothingfilter;
-  if (hasParameter("operation:smoothingFilterTolerance")) {
-    smoothingfilter = getParameter("operation:smoothingFilterTolerance")
-            //writeComment("smoohtingfilter: " + (smoothingfilter)); //write smoothing filter
-
-    if (smoothingfilter < .0015) {
-       smoothingmultiplyer = 1.5;
-       accelunit = 1;
-       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
-       }
-    if ((smoothingfilter >= .0015) && (smoothingfilter < .0025)) {
-       smoothingmultiplyer = (smoothingfilter * 1600);
-       accelunit = 1;
-       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
-        }
-    if (smoothingfilter >= .0025) {
-       smoothingmultiplyer = 4;
-       accelunit = 0;
-       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
-       }
-  }
-    else {
-       smoothingmultiplyer = 1; //set smoothing multipyer to 1 if no smoothing filter parameter exists
-       accelunit = 1; //set accel "P" value adjuster to 1 if no smoothing filter parameter exists
-  }
-
-
-  if (hasParameter("operation:tolerance")) {
-     var tolerance = (getParameter("operation:tolerance"));
-     if (tolerance <= .00125) {
-        writeBlock(gFormat.format(187) + " P" + (2 + accelunit) + " E" + (xyzFormat.format(smoothingmultiplyer) * .02));//" (<= .002 hsm tol)"
-        }
-        else {
-        if ((tolerance > .00125) && (tolerance < .003125)) {
-           writeBlock(gFormat.format(187) + " P" + (1 + accelunit) + " E" + (xyzFormat.format((smoothingmultiplyer) * ((tolerance) * 16))));//" (> .002 hsm tol)"
-           }
-           else {
-           if ((tolerance >= .00316) || ((smoothingfilter + tolerance) >= .0045)) {
-              writeBlock(gFormat.format(187) + " P1" + " E" + (0.200));//"(> .00316 or .0045 combined)"
-           }
-        }
-     }
-
-  }
-}
 
 function FeedContext(id, description, feed) {
   this.id = id;
@@ -2192,7 +2150,7 @@ function onSection() {
     liveConnectionWriteData("toolpathStart");
   }
   // define smoothing mode
-  initializeSmoothing();
+  //initializeSmoothing();
 
   if ((insertToolCall && !getProperty("fastToolChange")) || newWorkOffset || newWorkPlane || toolChecked) {
 
@@ -2403,8 +2361,59 @@ function onSection() {
     }
   }
 
-  smoothing.force = operationNeedsSafeStart && (getProperty("useSmoothing") != "-1");
-  setSmoothing(smoothing.isAllowed);
+  //Haas HSM control options
+  //P - Controls the smoothness level, P1(rough), P2(medium), or P3(finish). Temporarily overrides Setting 191. This will round corners in an effort keep the speed from decreasing.
+  //E - Sets the max corner rounding value.Temporarily overrides Setting 85.
+  //Setting 191 sets the default smoothness to the user specified ROUGH, MEDIUM, or FINISH when G187 is not active.The Medium setting is the factory default setting.
+
+  if (hasParameter("operation:strategy") && ((getParameter("operation:strategy")) !== ("drill"))) {
+  var smoothingmultiplyer;
+  var accelunit;
+  var smoothingfilter;
+  if (hasParameter("operation:smoothingFilterTolerance")) {
+    smoothingfilter = getParameter("operation:smoothingFilterTolerance")
+            //writeComment("smoohtingfilter: " + (smoothingfilter)); //write smoothing filter
+
+    if (smoothingfilter < .0015) {
+       smoothingmultiplyer = 1.5;
+       accelunit = 1;
+       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+       }
+    if ((smoothingfilter >= .0015) && (smoothingfilter < .0025)) {
+       smoothingmultiplyer = (smoothingfilter * 1600);
+       accelunit = 1;
+       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+        }
+    if (smoothingfilter >= .0025) {
+       smoothingmultiplyer = 4;
+       accelunit = 0;
+       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+       }
+  }
+    else {
+       smoothingmultiplyer = 1; //set smoothing multipyer to 1 if no smoothing filter parameter exists
+       accelunit = 1; //set accel "P" value adjuster to 1 if no smoothing filter parameter exists
+  }
+
+
+  if (hasParameter("operation:tolerance")) {
+     var tolerance = (getParameter("operation:tolerance"));
+     if (tolerance <= .00125) {
+        writeBlock(gFormat.format(187) + " P" + (2 + accelunit) + " E" + (xyzFormat.format(smoothingmultiplyer * ((tolerance) * 16))));//" (<= .002 hsm tol)"
+        }
+        else {
+        if ((tolerance > .00125) && (tolerance < .00315)) {
+           writeBlock(gFormat.format(187) + " P" + (1 + accelunit) + " E" + (xyzFormat.format((smoothingmultiplyer) * ((tolerance) * 16))));//" (> .002 hsm tol)"
+           }
+           else {
+           if ((tolerance >= .00315) || ((smoothingfilter + tolerance) >= .0045)) {
+              writeBlock(gFormat.format(187) + " P1" + " E" + (xyzFormat.format((smoothingmultiplyer) * ((tolerance) * 32)-.0758)));//"(> .00316 or .0045 combined)"
+           }
+        }
+     }
+
+  }
+  }
 
   var G = ((highFeedMapping != HIGH_FEED_NO_MAPPING) || !getProperty("useG0")) ? 1 : 0;
   var F = ((highFeedMapping != HIGH_FEED_NO_MAPPING) || !getProperty("useG0")) ? getFeed(highFeedrate) : "";
@@ -4308,8 +4317,8 @@ function setProperty(property, value) {
 // <<<<< INCLUDED FROM ../../../haas next generation.cps
 
 capabilities |= CAPABILITY_INSPECTION;
-description = "HAAS - Next Generation Control Inspect Surface";
-longDescription = "Generic post modified by Conturo Prototyping for the HAAS NGC with inspect surface & live connection capabilities.";
+description = "HAAS - NGC with inspect surface";
+longDescription = "Generic post modified and managed by Conturo Prototyping for HAAS NGC with inspect surface & live connection capabilities.";
 
 var controlType = "NGC"; // Specifies the control model "NGC" or "Classic"
 // >>>>> INCLUDED FROM ../common/haas base inspection.cps
