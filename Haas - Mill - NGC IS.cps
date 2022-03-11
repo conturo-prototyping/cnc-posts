@@ -9,10 +9,14 @@
     
     03/10/2022
     Billy @ CP
-      -Changed the way HAAS HSM smoothing (G187) is calculated, was based off STL, now it's a combo of tolerance and smoothing. Search HSM to find it in the code.
+      -changed the way HAAS HSM smoothing (G187) is calculated, was based off STL, now it's a combo of tolerance and smoothing. Search HSM to find it in the code.
       -removed duplicate minimum version, description, and long description
       -removed UMC1600 from the options
-      -make chip transport on by default
+      -make chip transport on by default (true)
+
+    03/10/2022
+    Billy @ CP
+      -added user and date to program
 
 
 */
@@ -35,8 +39,8 @@
 
 
 description = "HAAS - Mill - NGC";
-vendor = "h-AAS Automation";
-vendorUrl = "http://www.conturoprototyping.com";
+vendor = "HAAS Automation";
+vendorUrl = "https://www.haascnc.com/index.html";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
 minimumRevision = 00001;
@@ -1108,6 +1112,21 @@ function onOpen() {
       writeComment("  " + localize("description") + ": "  + description);
     }
   }
+
+  // write user name	
+
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+// write date	
+
+	      if (hasGlobalParameter("generated-at")) {
+    var datetime = getGlobalParameter("generated-at");
+		  writeComment("Program Posted: " + datetime);
+		  }  
 
   // dump tool information
   if (getProperty("writeTools")) {
