@@ -1,7 +1,7 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 00001 18ed74b0b685b0d3fd238e58719b897a383e6fa6$
+  $Revision: 4 $
   $Date: 2022-03-08 14:47:02 $
   
 
@@ -20,6 +20,10 @@
       -updated hsm calculaton a little bit
       -changed program title to be the title of the setup in fusion instead of comment
       -started to figure out how to print stock size at the top of the program
+
+    4  03/17/2022
+      -changed the revision stuff that was causing the octal something something error
+      -changed the G187 back to the way it was originally because of an E value out of range at machine
       
 
 
@@ -48,7 +52,7 @@ vendor = "HAAS Automation";
 vendorUrl = "https://www.haascnc.com/index.html";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
-minimumRevision = 00001;
+//minimumRevision = "00000";
 
 //longDescription = "Generic post for the HAAS Next Generation control. The post includes support for multi-axis indexing and simultaneous machining. The post utilizes the dynamic work offset feature so you can place your work piece as desired without having to repost your NC programs." + EOL +
 //"You can specify following pre-configured machines by using the property 'Machine model':" + EOL +
@@ -2371,8 +2375,8 @@ function onSection() {
   var accelunit;
   var smoothingfilter;
   if (hasParameter("operation:smoothingFilterTolerance")) {
-    smoothingfilter = getParameter("operation:smoothingFilterTolerance")
-            //writeComment("smoohtingfilter: " + (smoothingfilter)); //write smoothing filter
+    smoothingfilter = getParameter("operation:smoothingFilterTolerance")//print smoothing tolerance
+    writeComment("Smoothing: " + (smoothingfilter)); //write smoothing filter
 
     if (smoothingfilter < .0015) {
        smoothingmultiplyer = 1.5;
@@ -2398,6 +2402,7 @@ function onSection() {
 
   if (hasParameter("operation:tolerance")) {
      var tolerance = (getParameter("operation:tolerance"));
+     writeComment("Tolerance: "+(tolerance))//print tolerance
      if (tolerance <= .00125) {
         writeBlock(gFormat.format(187) + " P" + (2 + accelunit) + " E" + (xyzFormat.format(smoothingmultiplyer * ((tolerance) * 16))));//" (<= .002 hsm tol)"
         }
@@ -2407,7 +2412,7 @@ function onSection() {
            }
            else {
            if ((tolerance >= .00315) || ((smoothingfilter + tolerance) >= .0045)) {
-              writeBlock(gFormat.format(187) + " P1" + " E" + (xyzFormat.format((smoothingmultiplyer) * ((tolerance) * 32)-.0758)));//"(> .00316 or .0045 combined)"
+            writeBlock(gFormat.format(187) + " P1" + " E" + (0.200));//"(> .00316 or .0045 combined)"
            }
         }
      }
