@@ -23,7 +23,7 @@
 
     4  03/17/2022
       -changed the revision stuff that was causing the octal something something error
-      -changed teh G187 back to the way it was origionally because of an E value out of range at machine
+      -changed the G187 back to the way it was originally because of an E value out of range at machine
       
 
 
