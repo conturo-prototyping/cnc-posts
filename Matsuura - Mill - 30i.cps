@@ -17,7 +17,6 @@ legal = "Copyright (C) 2012-2020 by Autodesk, Inc.";
 certificationLevel = 2;
 minimumRevision = 40783;
 
-longDescription = "Generic post for Fanuc.";
 
 extension = "nc";
 programNameIsInteger = true;
@@ -265,10 +264,10 @@ function onOpen() {
   }
   gRotationModal.format(69); // Default to G69 Rotation Off
 
-  if (false) { // note: setup your machine here
-    var aAxis = createAxis({coordinate:0, table:false, axis:[1, 0, 0], range:[-360, 360], preference:1});
-    var cAxis = createAxis({coordinate:2, table:false, axis:[0, 0, 1], range:[-360, 360], preference:1});
-    machineConfiguration = new MachineConfiguration(aAxis, cAxis);
+  if (true) { // note: setup your machine here
+    var bAxis = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-110,110], cyclic:false, preference:-1});
+    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], cyclic:true, preference:0});
+    machineConfiguration = new MachineConfiguration(bAxis, cAxis);
 
     setMachineConfiguration(machineConfiguration);
     optimizeMachineAngles2(0); // TCP mode
