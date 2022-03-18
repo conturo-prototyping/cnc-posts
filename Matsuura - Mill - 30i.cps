@@ -18,7 +18,7 @@ certificationLevel = 2;
 minimumRevision = 40783;
 
 
-extension = "nc";
+extension = "";
 programNameIsInteger = true;
 setCodePage("ascii");
 
@@ -50,7 +50,7 @@ properties = {
   forceIJK: false, // force output of IJK for G2/G3 when not using R word
   useParametricFeed: false, // specifies that feed should be output using Q values
   showNotes: false, // specifies that operation notes should be output
-  useSmoothing: false, // specifies if smoothing should be used or not
+  useSmoothing: true, // specifies if smoothing should be used or not
   usePitchForTapping: false, // enable to use pitch instead of feed for the F-word for canned tapping cycles - note that your CNC control must be setup for pitch mode!
   useG95: false, // use IPR/MPR instead of IPM/MPM
   useG28: true, // specifies that G28 should be used instead of G53
@@ -103,15 +103,17 @@ var singleLineCoolant = false; // specifies to output multiple coolant codes in 
 // samples:
 // {id: COOLANT_THROUGH_TOOL, on: 88, off: 89}
 // {id: COOLANT_THROUGH_TOOL, on: [8, 88], off: [9, 89]}
+// Values {id: COOLANT_THROUGH_TOOL, on: 88, off: 89} changed to 50 on , 09 off DR 04/09/2021
+// Values {id: COOLANT_THROUGH_TOOL, on: [8, 88], off: [9, 89]} changed to on:8,50  off 9 DR 04/09/2021
 var coolants = [
   {id: COOLANT_FLOOD, on: 8},
   {id: COOLANT_MIST},
-  {id: COOLANT_THROUGH_TOOL, on: 88, off: 89},
-  {id: COOLANT_AIR},
+  {id: COOLANT_THROUGH_TOOL, on: 50, off: 9},
+  {id: COOLANT_AIR ,on: 25, off: 27},
   {id: COOLANT_AIR_THROUGH_TOOL},
   {id: COOLANT_SUCTION},
   {id: COOLANT_FLOOD_MIST},
-  {id: COOLANT_FLOOD_THROUGH_TOOL, on: [8, 88], off: [9, 89]},
+  {id: COOLANT_FLOOD_THROUGH_TOOL, on: [8, 50], off: [9]},
   {id: COOLANT_OFF, off: 9}
 ];
 
@@ -266,7 +268,7 @@ function onOpen() {
 
   if (true) { // note: setup your machine here
     var bAxis = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-110,110], cyclic:false, preference:-1});
-    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], cyclic:true, preference:0});
+    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360,0], cyclic:true});
     machineConfiguration = new MachineConfiguration(bAxis, cAxis);
 
     setMachineConfiguration(machineConfiguration);
@@ -446,6 +448,8 @@ function onOpen() {
     feedFormat = createFormat({decimals:(unit == MM ? 4 : 5), forceDecimal:true});
     feedOutput = createVariable({prefix:"F"}, feedFormat);
   }
+  
+  writeBlock(gFormat.format(130));
 }
 
 function onComment(message) {
@@ -507,7 +511,12 @@ function setSmoothing(mode) {
   validate(!lengthCompensationActive, "Length compensation is active while trying to update smoothing.");
 
   currentSmoothing = mode;
-  writeBlock(gFormat.format(5.1), mode ? "Q1" : "Q0");
+  if (mode) {
+	writeBlock(gFormat.format(131), "R5");
+  } else {
+	writeBlock(gFormat.format(130));
+  }
+
   return true;
 }
 
@@ -675,6 +684,7 @@ function defineWorkPlane(_section, _setWorkPlane) {
     // set working plane after datum shift
 
     if (_section.isMultiAxis()) {
+	  cancelWorkPlane();
       cancelTransformation();
       if (_setWorkPlane) {
         forceWorkPlane();
@@ -860,6 +870,12 @@ var probeOutputWorkOffset = 1;
 function onParameter(name, value) {
   if (name == "probe-output-work-offset") {
     probeOutputWorkOffset = (value > 0) ? value : 1;
+  }
+}
+function onPassThrough(text) {
+  var commands = String(text).split(",");
+  for (text in commands) {
+    writeBlock(commands[text]);
   }
 }
 
@@ -1144,8 +1160,11 @@ function onSection() {
     // retract to safe plane
     writeRetract(Z); // retract
     forceXYZ();
-    if ((insertToolCall && !isFirstSection()) || forceSmoothing) {
+	if ((insertToolCall && !isFirstSection()) || forceSmoothing || newWorkPlane) {
       disableLengthCompensation();
+    }
+    if ((insertToolCall && !isFirstSection()) || forceSmoothing) {
+	  cancelWorkPlane();
       setSmoothing(false);
     }
   }
@@ -1187,7 +1206,7 @@ function onSection() {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
 
-    if (tool.number > 99) {
+    if (tool.number > 150) {
       warning(localize("Tool number exceeds maximum value."));
     }
 
@@ -1297,16 +1316,7 @@ function onSection() {
   }
 
   forceXYZ();
-
-  var abc = defineWorkPlane(currentSection, true);
-
-  if (g68RotationMode != 0 && (insertToolCall || gRotationModal.getCurrent() == 69)) {
-    setProbingAngle();
-  }
-
-  // set coolant after we have positioned at Z
-  setCoolant(tool.coolant);
-
+  
   if (properties.useSmoothing) {
     if (hasParameter("operation-strategy") && (getParameter("operation-strategy") != "drill")) {
       if (setSmoothing(true)) {
@@ -1317,7 +1327,28 @@ function onSection() {
         // we force G43 using lengthCompensationActive
       }
     }
+  }	
+
+  if (currentSection.isMultiAxis()) {
+	  onCommand(COMMAND_UNLOCK_MULTI_AXIS);
+	  gMotionModal.reset();
+	  writeBlock(
+		gMotionModal.format(0),
+		conditional(machineConfiguration.isMachineCoordinate(0), "A" + abcFormat.format(0)),
+		conditional(machineConfiguration.isMachineCoordinate(1), "B" + abcFormat.format(0)),
+		conditional(machineConfiguration.isMachineCoordinate(2), "C" + abcFormat.format(0))
+	  );
+	var abc = defineWorkPlane(currentSection, false);
+  } else {
+	var abc = defineWorkPlane(currentSection, true);
   }
+
+  if (g68RotationMode != 0 && (insertToolCall || gRotationModal.getCurrent() == 69)) {
+    setProbingAngle();
+  }
+
+  // set coolant after we have positioned at Z
+  setCoolant(tool.coolant);
 
   forceAny();
   gMotionModal.reset();
@@ -1332,7 +1363,7 @@ function onSection() {
 
   if (insertToolCall || !lengthCompensationActive || retracted || (!isFirstSection() && getPreviousSection().isMultiAxis())) {
     var lengthOffset = tool.lengthOffset;
-    if (lengthOffset > 99) {
+    if (lengthOffset > 150) {
       error(localize("Length offset out of range."));
       return;
     }
@@ -1362,7 +1393,7 @@ function onSection() {
         gMotionModal.format(0),
         gFormat.format(offsetCode),
         zOutput.format(initialPosition.z),
-        hFormat.format(lengthOffset)
+        "H#517"
       );
       lengthCompensationActive = true;
     } else {
@@ -1372,7 +1403,7 @@ function onSection() {
         gFormat.format(offsetCode),
         xOutput.format(initialPosition.x),
         yOutput.format(initialPosition.y),
-        zOutput.format(initialPosition.z), hFormat.format(lengthOffset)
+        zOutput.format(initialPosition.z), "H#517"
       );
       lengthCompensationActive = true;
     }
@@ -1681,7 +1712,7 @@ function onCyclePoint(x, y, z) {
       break;
     case "tapping":
       if (properties.useRigidTapping != "no") {
-        writeBlock(mFormat.format(29), sOutput.format(spindleSpeed));
+        writeBlock(mFormat.format(80), sOutput.format(spindleSpeed));
       }
       if (properties.usePitchForTapping) {
         writeBlock(
@@ -1704,7 +1735,7 @@ function onCyclePoint(x, y, z) {
       break;
     case "left-tapping":
       if (properties.useRigidTapping != "no") {
-        writeBlock(mFormat.format(29), sOutput.format(spindleSpeed));
+        writeBlock(mFormat.format(80), sOutput.format(spindleSpeed));
       }
       if (properties.usePitchForTapping) {
         writeBlock(
@@ -1727,7 +1758,7 @@ function onCyclePoint(x, y, z) {
       break;
     case "right-tapping":
       if (properties.useRigidTapping != "no") {
-        writeBlock(mFormat.format(29), sOutput.format(spindleSpeed));
+        writeBlock(mFormat.format(80), sOutput.format(spindleSpeed));
       }
       if (properties.usePitchForTapping) {
         writeBlock(
@@ -1756,7 +1787,7 @@ function onCyclePoint(x, y, z) {
         return;
       } else {
         if (properties.useRigidTapping != "no") {
-          writeBlock(mFormat.format(29), sOutput.format(spindleSpeed));
+          writeBlock(mFormat.format(80), sOutput.format(spindleSpeed));
         }
         if (properties.usePitchForTapping) {
           writeBlock(
@@ -2283,18 +2314,18 @@ function onLinear(_x, _y, _z, feed) {
     if (pendingRadiusCompensation >= 0) {
       pendingRadiusCompensation = -1;
       var d = tool.diameterOffset;
-      if (d > 99) {
+      if (d > 150) {
         warning(localize("The diameter offset exceeds the maximum value."));
       }
       writeBlock(gPlaneModal.format(17));
       switch (radiusCompensation) {
       case RADIUS_COMPENSATION_LEFT:
         dOutput.reset();
-        writeBlock(gMotionModal.format(1), gFormat.format(41), x, y, z, dOutput.format(d), f);
+        writeBlock(gMotionModal.format(1), gFormat.format(41), x, y, z, "D#517", f);
         break;
       case RADIUS_COMPENSATION_RIGHT:
         dOutput.reset();
-        writeBlock(gMotionModal.format(1), gFormat.format(42), x, y, z, dOutput.format(d), f);
+        writeBlock(gMotionModal.format(1), gFormat.format(42), x, y, z, "D#517", f);
         break;
       default:
         writeBlock(gMotionModal.format(1), gFormat.format(40), x, y, z, f);
@@ -2565,8 +2596,12 @@ function onCommand(command) {
     onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
     return;
   case COMMAND_LOCK_MULTI_AXIS:
+	writeBlock(mFormat.format(21)); //lock 4th
+	writeBlock(mFormat.format(23)); //lock 5th
     return;
   case COMMAND_UNLOCK_MULTI_AXIS:
+	writeBlock(mFormat.format(22)); //unlock 4th
+	writeBlock(mFormat.format(24)); //unlock 5th
     return;
   case COMMAND_START_CHIP_TRANSPORT:
     return;
@@ -2731,14 +2766,16 @@ function onClose() {
   optionalSection = false;
 
   onCommand(COMMAND_COOLANT_OFF);
+  retracted = true;
+  disableLengthCompensation(true);
 
   writeRetract(Z); // retract
   
-  disableLengthCompensation(true);
+  setWorkPlane(new Vector(0, 0, 0)); // reset working plane
   setSmoothing(false);
   zOutput.reset();
 
-  setWorkPlane(new Vector(0, 0, 0)); // reset working plane
+
 
   if (isG54x4Used) {
     writeBlock(gFormat.format(54.4), "P0");
