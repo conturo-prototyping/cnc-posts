@@ -1,22 +1,29 @@
 /**
-  Copyright (C) 2012-2020 by Autodesk, Inc.
-  All rights reserved.
-
-  FANUC post processor configuration.
-
-  $Revision: 42831 17c7160294bbeecc46faa18c5e7a2c703384f949 $
-  $Date: 2020-06-18 05:04:27 $
+ * 
+ * 
   
-  FORKID {04622D27-72F0-45d4-85FB-DB346FD1AE22}
-*/
+  Matsuura Fanuc 30i post processor
 
-description = "FANUC";
-vendor = "Fanuc";
-vendorUrl = "http://www.fanuc.com";
-legal = "Copyright (C) 2012-2020 by Autodesk, Inc.";
+   $Revision: 00003 21df9e93956e7164e5f6e81ec3f3fd72618f6775 $
+  $Date:  $
+
+  Matsuura Fanuc 30i post processor configuration
+  3 - Billy Conturo @ Conturo Prototyping 2022-18-03
+    -changed the info for the post to match naming convention in fusion
+    -reloaded everything into gethub
+    -checked .nc file  extention was removed
+    
+    
+    */
+
+description = "Matsuura - Fanuc 30i";
+vendor = "Matsuura";
+vendorUrl = "https://www.matsuura.co.jp/english/";
+legal = "Conturo Prototyping";
 certificationLevel = 2;
-minimumRevision = 40783;
+minimumRevision = 0 ;
 
+longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo prototyping";
 
 extension = "";
 programNameIsInteger = true;
