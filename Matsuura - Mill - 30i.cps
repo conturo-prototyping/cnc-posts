@@ -4,26 +4,30 @@
   
   Matsuura Fanuc 30i post processor
 
-   $Revision: 00003 21df9e93956e7164e5f6e81ec3f3fd72618f6775 $
+  $Revision: 4  $
   $Date:  $
 
   Matsuura Fanuc 30i post processor configuration
-  3 - Billy Conturo @ Conturo Prototyping 2022-18-03
+  3 - 3/18/2022
+  Billy @ CP 
     -changed the info for the post to match naming convention in fusion
     -reloaded everything into gethub
     -checked .nc file  extention was removed
     
+  4 - 3/24/2022
+  Billy @ CP
+    -added "CP" to description per Patricks request
     
     */
 
-description = "Matsuura - Fanuc 30i";
+description = "CP - Matsuura - Fanuc 30i";
 vendor = "Matsuura";
 vendorUrl = "https://www.matsuura.co.jp/english/";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
 minimumRevision = 0 ;
 
-longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo prototyping";
+longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo prototyping and NexGenCam";
 
 extension = "";
 programNameIsInteger = true;
