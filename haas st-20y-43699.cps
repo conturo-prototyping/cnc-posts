@@ -10,7 +10,7 @@
   FORKID {14D60AD3-4366-49dc-939C-4DB5EA48FF68}
 */
 
-description = "HAAS ST-20Y Conturo 2022";
+description = "HAAS ST-20Y ";
 
 var gotYAxis = true;
 var yAxisMinimum = toPreciseUnit(gotYAxis ? -50.8 : 0, MM); // specifies the minimum range for the Y-axis
