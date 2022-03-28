@@ -1,7 +1,7 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 5 $
+  $Revision: 6 $
   $Date: 2022-03-08 14:47:02 $
   
 
@@ -28,6 +28,10 @@
     5 03/24/2022
     Billy @ CP
       -added "CP" at the beginning of the description per Patricks request
+
+    6 03/28/2022
+    Billy @ CP
+      -added "mill" to the discription
 
 
 
@@ -4325,7 +4329,7 @@ function setProperty(property, value) {
 // <<<<< INCLUDED FROM ../../../haas next generation.cps
 
 capabilities |= CAPABILITY_INSPECTION;
-description = "CP - HAAS - NGC";
+description = "CP - HAAS - Mill - NGC";
 longDescription = "Generic post modified and managed by Conturo Prototyping for HAAS NGC with inspect surface & live connection capabilities.";
 
 var controlType = "NGC"; // Specifies the control model "NGC" or "Classic"

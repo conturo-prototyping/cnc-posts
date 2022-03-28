@@ -4,7 +4,7 @@
   
   Matsuura Fanuc 30i post processor
 
-  $Revision: 4  $
+  $Revision: 5  $
   $Date:  $
 
   Matsuura Fanuc 30i post processor configuration
@@ -17,10 +17,13 @@
   4 - 3/24/2022
   Billy @ CP
     -added "CP" to description per Patricks request
-    
+
+  5 - 3/25/2022
+  Billy @ CP
+    - added "mill" to discription
     */
 
-description = "CP - Matsuura - Fanuc 30i";
+description = "CP - Matsuura - Mill - Fanuc 30i";
 vendor = "Matsuura";
 vendorUrl = "https://www.matsuura.co.jp/english/";
 legal = "Conturo Prototyping";
