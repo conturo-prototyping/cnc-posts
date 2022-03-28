@@ -4,7 +4,7 @@
 
   HAAS Lathe post processor configuration.
 
-  $Revision: 2$
+  $Revision: 2 $
 
 
 
