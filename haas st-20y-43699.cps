@@ -8,9 +8,14 @@
   $Date: 2022-03-16 15:42:56 $
 
   FORKID {14D60AD3-4366-49dc-939C-4DB5EA48FF68}
+
+
+V1.1 added adc 1-7-2021
+  -added username date&time
+
 */
 
-description = "HAAS ST-20Y ";
+description = "HAAS ST-20Y V1.2 Conturo 2022";
 
 var gotYAxis = true;
 var yAxisMinimum = toPreciseUnit(gotYAxis ? -50.8 : 0, MM); // specifies the minimum range for the Y-axis
@@ -1063,6 +1068,33 @@ function onOpen() {
       writeComment("  " + localize("description") + ": "  + description);
     }
   }
+
+{
+
+// added user name & date + time adc-1-1-2022
+
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date	and time of computer
+  
+    const d = new Date();
+    const h = d.getHours();
+    const hrs_12 = h > 12 ? h - 12 : h;
+    const m = d.getMinutes();
+    const pm_am = h > 12 ? 'PM' : 'AM';
+
+    writeComment(
+      'Posted: ' +
+        d.toLocaleDateString() + ' ' +
+        hrs_12 + ':' + m + ' ' + pm_am
+    );
+   
+}
 
   // dump tool information
   if (getProperty("writeTools")) {
