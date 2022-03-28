@@ -4,13 +4,17 @@
 
   HAAS Lathe post processor configuration.
 
-  $Revision: 2 $
+  $Revision: 3 $
 
 
 
 
 V2 added adc 3-28-2021
   -added username date&time
+
+V3 changed adc 3-28-2022
+  -write tools to true  
+  -write numbers to true
 
 */
 
@@ -80,7 +84,7 @@ properties = {
     description: "Output a tool list in the header of the code.",
     group      : "general",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   writeVersion: {
@@ -96,7 +100,7 @@ properties = {
     description: "Use sequence numbers for each block of outputted code.",
     group      : "general",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   sequenceNumberStart: {
