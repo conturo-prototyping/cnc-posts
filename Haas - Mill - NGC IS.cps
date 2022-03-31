@@ -1,8 +1,8 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 6 $
-  $Date: 2022-03-08 14:47:02 $
+  $Revision: 7 $
+  $Date: 2022-03-31 $
   
 
     Conturo Prototyping Version Info
@@ -33,6 +33,9 @@
     Billy @ CP
       -added "mill" to the discription
 
+    7 03/31/2022
+    Billy @ CP
+      -reverted back to Fusion post version 43573 from version 43690 because of inspection not working
 
 
 */
@@ -1049,12 +1052,6 @@ function onOpen() {
   if (!getProperty("useMultiAxisFeatures")) {
     useDwoForPositioning = false;
   }
-  if (getProperty("useLiveConnection")) {
-    if (getProperty("showSequenceNumbers")) {
-      warning(localize("'Use sequence numbers' is switched off due to live connection."));
-    }
-    setProperty("showSequenceNumbers", false);
-  }
 
   gRotationModal.format(69); // Default to G69 Rotation Off
   ssvModal.format(139); // Default to M139 SSV turned off
@@ -1088,14 +1085,10 @@ function onOpen() {
     }
     // program number plus name (programComment or jobdescription)
     var jobdescription = (getGlobalParameter("job-description"))
-    //var stockwidth = (getProperty("job_stockfixedx"))
     writeln(
       "O" + oFormat.format(programId) +
       conditional(jobdescription, " " + formatComment(jobdescription.substr(0, maximumLineLength - 2 - ("O" + oFormat.format(programId)).length - 1)))
     );
-    //writeln(
-    //  formatComment(stockwidth)
-    //)
     lastSubprogram = (initialSubprogramNumber - 1);
   } else {
     error(localize("Program name has not been specified."));
@@ -1144,9 +1137,9 @@ function onOpen() {
 		  }
 		  
 // write date
-	      if (hasGlobalParameter("generated-at")) {
+	if (hasGlobalParameter("generated-at")) {
     var datetime = getGlobalParameter("generated-at");
-		  writeComment("Program Posted: " + datetime);
+		  writeComment("Program Posted: " + datetime + "UTC0");
 		  }  
 
   // dump tool information
@@ -1334,9 +1327,6 @@ function onOpen() {
   if (typeof inspectionWriteVariables == "function") {
     inspectionWriteVariables();
   }
-  if (getProperty("useLiveConnection") && (typeof liveConnectionHeader == "function")) {
-    liveConnectionHeader();
-  }
 }
 
 function onComment(message) {
@@ -1377,8 +1367,6 @@ function disableLengthCompensation(force, message) {
     lengthCompensationActive = false;
   }
 }
-
-
 
 function FeedContext(id, description, feed) {
   this.id = id;
@@ -2156,12 +2144,6 @@ function onSection() {
     }
   }
 
-  // toolpath starting information for live connection
-  if (getProperty("useLiveConnection") && (typeof liveConnectionWriteData == "function")) {
-    liveConnectionWriteData("toolpathStart");
-  }
-  // define smoothing mode
-  //initializeSmoothing();
 
   if ((insertToolCall && !getProperty("fastToolChange")) || newWorkOffset || newWorkPlane || toolChecked) {
 
@@ -2372,60 +2354,60 @@ function onSection() {
     }
   }
 
-  //Haas HSM control options
+   //Haas HSM control options
   //P - Controls the smoothness level, P1(rough), P2(medium), or P3(finish). Temporarily overrides Setting 191. This will round corners in an effort keep the speed from decreasing.
   //E - Sets the max corner rounding value.Temporarily overrides Setting 85.
   //Setting 191 sets the default smoothness to the user specified ROUGH, MEDIUM, or FINISH when G187 is not active.The Medium setting is the factory default setting.
 
   if (hasParameter("operation:strategy") && ((getParameter("operation:strategy")) !== ("drill"))) {
-  var smoothingmultiplyer;
-  var accelunit;
-  var smoothingfilter;
-  if (hasParameter("operation:smoothingFilterTolerance")) {
-    smoothingfilter = getParameter("operation:smoothingFilterTolerance")//print smoothing tolerance
-    writeComment("Smoothing: " + (smoothingfilter)); //write smoothing filter
-
-    if (smoothingfilter < .0015) {
-       smoothingmultiplyer = 1.5;
-       accelunit = 1;
-       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+    var smoothingmultiplyer;
+    var accelunit;
+    var smoothingfilter;
+    if (hasParameter("operation:smoothingFilterTolerance")) {
+      smoothingfilter = getParameter("operation:smoothingFilterTolerance")//print smoothing tolerance
+      writeComment("Smoothing: " + (smoothingfilter)); //write smoothing filter
+  
+      if (smoothingfilter < .0015) {
+         smoothingmultiplyer = 1.5;
+         accelunit = 1;
+         //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+         }
+      if ((smoothingfilter >= .0015) && (smoothingfilter < .0025)) {
+         smoothingmultiplyer = (smoothingfilter * 1600);
+         accelunit = 1;
+         //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+          }
+      if (smoothingfilter >= .0025) {
+         smoothingmultiplyer = 4;
+         accelunit = 0;
+         //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
+         }
+    }
+      else {
+         smoothingmultiplyer = 1; //set smoothing multipyer to 1 if no smoothing filter parameter exists
+         accelunit = 1; //set accel "P" value adjuster to 1 if no smoothing filter parameter exists
+    }
+  
+  
+    if (hasParameter("operation:tolerance")) {
+       var tolerance = (getParameter("operation:tolerance"));
+       writeComment("Tolerance: "+(tolerance))//print tolerance
+       if (tolerance <= .00125) {
+          writeBlock(gFormat.format(187) + " P" + (2 + accelunit) + " E" + (xyzFormat.format(smoothingmultiplyer * ((tolerance) * 16))));//" (<= .002 hsm tol)"
+          }
+          else {
+          if ((tolerance > .00125) && (tolerance < .00315)) {
+             writeBlock(gFormat.format(187) + " P" + (1 + accelunit) + " E" + (xyzFormat.format((smoothingmultiplyer) * ((tolerance) * 16))));//" (> .002 hsm tol)"
+             }
+             else {
+             if ((tolerance >= .00315) || ((smoothingfilter + tolerance) >= .0045)) {
+              writeBlock(gFormat.format(187) + " P1" + " E" + (0.200));//"(> .00316 or .0045 combined)"
+             }
+          }
        }
-    if ((smoothingfilter >= .0015) && (smoothingfilter < .0025)) {
-       smoothingmultiplyer = (smoothingfilter * 1600);
-       accelunit = 1;
-       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
-        }
-    if (smoothingfilter >= .0025) {
-       smoothingmultiplyer = 4;
-       accelunit = 0;
-       //writeComment("smoothingmultiplyer: " + (smoothingmultiplyer)); //write smoothing multiplyer
-       }
-  }
-    else {
-       smoothingmultiplyer = 1; //set smoothing multipyer to 1 if no smoothing filter parameter exists
-       accelunit = 1; //set accel "P" value adjuster to 1 if no smoothing filter parameter exists
-  }
-
-
-  if (hasParameter("operation:tolerance")) {
-     var tolerance = (getParameter("operation:tolerance"));
-     writeComment("Tolerance: "+(tolerance))//print tolerance
-     if (tolerance <= .00125) {
-        writeBlock(gFormat.format(187) + " P" + (2 + accelunit) + " E" + (xyzFormat.format(smoothingmultiplyer * ((tolerance) * 16))));//" (<= .002 hsm tol)"
-        }
-        else {
-        if ((tolerance > .00125) && (tolerance < .00315)) {
-           writeBlock(gFormat.format(187) + " P" + (1 + accelunit) + " E" + (xyzFormat.format((smoothingmultiplyer) * ((tolerance) * 16))));//" (> .002 hsm tol)"
-           }
-           else {
-           if ((tolerance >= .00315) || ((smoothingfilter + tolerance) >= .0045)) {
-            writeBlock(gFormat.format(187) + " P1" + " E" + (0.200));//"(> .00316 or .0045 combined)"
-           }
-        }
-     }
-
-  }
-  }
+  
+    }
+    }
 
   var G = ((highFeedMapping != HIGH_FEED_NO_MAPPING) || !getProperty("useG0")) ? 1 : 0;
   var F = ((highFeedMapping != HIGH_FEED_NO_MAPPING) || !getProperty("useG0")) ? getFeed(highFeedrate) : "";
@@ -2887,23 +2869,20 @@ function onCyclePoint(x, y, z) {
           case 17:
             xOutput.reset();
             position = xOutput.format(x);
-            depth = zOutput.format(u);
+            depth = "Z" + xyzFormat.format(u);
             break;
           case 18:
             zOutput.reset();
             position = zOutput.format(z);
-            depth = yOutput.format(u);
+            depth = "Y" + xyzFormat.format(u);
             break;
           case 19:
             yOutput.reset();
             position = yOutput.format(y);
-            depth = xOutput.format(u);
+            depth = "X" + xyzFormat.format(u);
             break;
           }
           writeBlock(conditional(u <= cycle.bottom, gRetractModal.format(98)), position, depth);
-        }
-        if (incrementalMode) {
-          setCyclePosition(cycle.retract);
         }
       }
       forceFeed();
@@ -3142,9 +3121,6 @@ function onCyclePoint(x, y, z) {
         // not required "R" + xyzFormat.format(-cycle.probeClearance),
         getProbingArguments(cycle, true)
       );
-      if (getProperty("useLiveConnection") && (typeof liveConnectionStoreResults == "function")) {
-        liveConnectionStoreResults();
-      }
       writeBlock(
         gFormat.format(65), "P" + 9812,
         "Y" + xyzFormat.format(cycle.width2),
@@ -3163,9 +3139,6 @@ function onCyclePoint(x, y, z) {
         "Q" + xyzFormat.format(cycle.probeOvertravel),
         getProbingArguments(cycle, true)
       );
-      if (getProperty("useLiveConnection") && (typeof liveConnectionStoreResults == "function")) {
-        liveConnectionStoreResults();
-      }
       writeBlock(
         gFormat.format(65), "P" + 9812,
         "Z" + xyzFormat.format(z - cycle.depth),
@@ -3185,9 +3158,6 @@ function onCyclePoint(x, y, z) {
         "R" + xyzFormat.format(-cycle.probeClearance),
         getProbingArguments(cycle, true)
       );
-      if (getProperty("useLiveConnection") && (typeof liveConnectionStoreResults == "function")) {
-        liveConnectionStoreResults();
-      }
       writeBlock(
         gFormat.format(65), "P" + 9812,
         "Z" + xyzFormat.format(z - cycle.depth),
@@ -3407,9 +3377,6 @@ function onCycleEnd() {
       writeBlock(gCycleModal.format(80), conditional(getProperty("useG95forTapping"), gFeedModeModal.format(94)));
       gMotionModal.reset();
     }
-  }
-  if (getProperty("useLiveConnection") && isProbeOperation() && typeof liveConnectionWriteData == "function") {
-    liveConnectionWriteData("macroEnd");
   }
 }
 
@@ -4019,13 +3986,6 @@ function onSectionEnd() {
     }
   }
 
-  if (getProperty("useLiveConnection") && (typeof liveConnectionWriteData == "function")) {
-    if (isInspectionOperation()) {
-      liveConnectionWriteData("inspectSurfaceAlarm");
-    }
-    liveConnectionWriteData("toolpathEnd");
-  }
-
   // reset for next section
   operationNeedsSafeStart = false;
   coolantPressure = getProperty("coolantPressure");
@@ -4125,9 +4085,6 @@ function writeRetract() {
 
 var isDPRNTopen = false;
 function inspectionCreateResultsFileHeader() {
-  if (getProperty("useLiveConnection") && controlType != "NGC") {
-    return; // do not DPRNT if Live connection is active on a classic control
-  }
   if (isDPRNTopen) {
     if (!getProperty("singleResultsFile")) {
       writeln("DPRNT[END]");
@@ -4137,7 +4094,7 @@ function inspectionCreateResultsFileHeader() {
   }
 
   if (isProbeOperation() && !printProbeResults()) {
-    return; // if print results is not desired by probe/probeWCS
+    return; // if print results is not desired by probe/ probeWCS
   }
 
   if (!isDPRNTopen) {
@@ -4176,9 +4133,6 @@ function getPointNumber() {
 }
 
 function inspectionWriteCADTransform() {
-  if (getProperty("useLiveConnection") && controlType != "NGC") {
-    return; // do not DPRNT if Live connection is active on a classic control
-  }
   var cadOrigin = currentSection.getModelOrigin();
   var cadWorkPlane = currentSection.getModelPlane().getTransposed();
   var cadEuler = cadWorkPlane.getEuler2(EULER_XYZ_S);
@@ -4198,18 +4152,6 @@ function inspectionWriteCADTransform() {
 function inspectionWriteWorkplaneTransform() {
   var orientation = (machineConfiguration.isMultiAxisConfiguration() && currentMachineABC != undefined) ? machineConfiguration.getOrientation(currentMachineABC) : currentSection.workPlane;
   var abc = orientation.getEuler2(EULER_XYZ_S);
-  if ((getProperty("useLiveConnection"))) {
-    liveConnectorInterface("WORKPLANE");
-    writeBlock(inspectionVariables.liveConnectionWPA + " = " + abcFormat.format(abc.x));
-    writeBlock(inspectionVariables.liveConnectionWPB + " = " + abcFormat.format(abc.y));
-    writeBlock(inspectionVariables.liveConnectionWPC + " = " + abcFormat.format(abc.z));
-    writeBlock("IF [" + inspectionVariables.workplaneStartAddress, "EQ -1] THEN",
-      inspectionVariables.workplaneStartAddress, "=", currentSection.getParameter("autodeskcam:operation-id")
-    );
-  }
-  if (getProperty("useLiveConnection") && controlType != "NGC") {
-    return; // do not DPRNT if Live connection is active on a classic control
-  }
   writeln("DPRNT[G330" +
     "*N" + getPointNumber() +
     "*A" + abcFormat.format(abc.x) +
@@ -4220,9 +4162,6 @@ function inspectionWriteWorkplaneTransform() {
 }
 
 function writeProbingToolpathInformation(cycleDepth) {
-  if (getProperty("useLiveConnection") && controlType != "NGC") {
-    return; // do not DPRNT if Live connection is active on a classic control
-  }
   writeln("DPRNT[TOOLPATHID*" + getParameter("autodeskcam:operation-id") + "]");
   if (isInspectionOperation()) {
     writeln("DPRNT[TOOLPATH*" + getParameter("operation-comment") + "]");
@@ -4232,17 +4171,14 @@ function writeProbingToolpathInformation(cycleDepth) {
 }
 
 function onClose() {
-  if (!(getProperty("useLiveConnection") && controlType != "NGC")) {
-    if (isDPRNTopen) {
-      writeln("DPRNT[END]");
-      writeBlock("PCLOS");
-      isDPRNTopen = false;
+  if (isDPRNTopen) {
+    writeln("DPRNT[END]");
+    writeBlock("PCLOS");
+    isDPRNTopen = false;
+    if (typeof inspectionProcessSectionEnd == "function") {
+      inspectionProcessSectionEnd();
     }
   }
-  if (!getProperty("useLiveConnection") && typeof inspectionProcessSectionEnd == "function") {
-    inspectionProcessSectionEnd();
-  }
-
   cancelG68Rotation();
   writeln("");
 
@@ -4277,11 +4213,6 @@ function onClose() {
     } else {
       writeRetract(X, Y);
     }
-  }
-
-  if (getProperty("useLiveConnection")) {
-    writeComment("Live Connection Footer"); // Live connection write footer
-    writeBlock(inspectionVariables.liveConnectionStatus, "= 2"); // If using live connection set results active to a 2 to signify program end
   }
 
   onImpliedCommand(COMMAND_END);
@@ -4329,15 +4260,55 @@ function setProperty(property, value) {
 // <<<<< INCLUDED FROM ../../../haas next generation.cps
 
 capabilities |= CAPABILITY_INSPECTION;
-description = "CP - HAAS - Mill - NGC";
-longDescription = "Generic post modified and managed by Conturo Prototyping for HAAS NGC with inspect surface & live connection capabilities.";
+description = "HAAS - Next Generation Control Inspect Surface";
+longDescription = "Generic post for the HAAS Next Generation control with inspect surface capabilities.";
 
 var controlType = "NGC"; // Specifies the control model "NGC" or "Classic"
 // >>>>> INCLUDED FROM ../common/haas base inspection.cps
+properties.probeLocalVar = {
+  title      : "Local variable start",
+  description: "Specify the starting value for macro # variables that are to be used for calculations during inspection paths.",
+  group      : 99,
+  type       : "integer",
+  value      : (controlType == "NGC" ? 10000 : 100),
+  scope      : "post"
+};
+properties.useDirectConnection = {
+  title      : "Stream Measured Point Data",
+  description: "Set to true to stream inspection results.",
+  group      : 99,
+  type       : "boolean",
+  value      : false,
+  scope      : "post"
+};
+properties.probeResultsBuffer = {
+  title      : "Measurement results store start",
+  description: "Specify the starting value of macro # variables where measurement results are stored.",
+  group      : 99,
+  type       : "integer",
+  value      : (controlType == "NGC" ? 10100 : 150),
+  scope      : "post"
+};
+properties.probeNumberofPoints = {
+  title      : "Measurement number of points to store",
+  description: "This is the maximum number of measurement results that can be stored in the buffer.",
+  group      : 99,
+  type       : "integer",
+  value      : 4,
+  scope      : "post"
+};
+properties.controlConnectorVersion = {
+  title      : "Results connector version",
+  description: "Interface version for direct connection to read inspection results.",
+  group      : 99,
+  type       : "integer",
+  value      : 1,
+  scope      : "post"
+};
 properties.toolOffsetType = {
   title      : "Tool offset type",
   description: "Select the which offsets are available on the tool offset page.",
-  group      : "probing",
+  group      : 99,
   type       : "enum",
   values     : [
     {id:"geomWear", title:"Geometry & Wear"},
@@ -4349,7 +4320,7 @@ properties.toolOffsetType = {
 properties.commissioningMode = {
   title      : "Inspection Commissioning Mode",
   description: "Enables commissioning mode where M0 and messages are output at key points in the program.",
-  group      : "probing",
+  group      : 99,
   type       : "boolean",
   value      : true,
   scope      : "post"
@@ -4357,7 +4328,7 @@ properties.commissioningMode = {
 properties.probeOnCommand = {
   title      : "Probe On Command",
   description: "The command used to turn the probe on, this can be a M code or sub program call.",
-  group      : "probing",
+  group      : 99,
   type       : "string",
   value      : "G65 P9832",
   scope      : "post"
@@ -4365,23 +4336,15 @@ properties.probeOnCommand = {
 properties.probeOffCommand = {
   title      : "Probe Off Command",
   description: "The command used to turn the probe off, this can be a M code or sub program call.",
-  group      : "probing",
+  group      : 99,
   type       : "string",
   value      : "G65 P9833",
-  scope      : "post"
-};
-properties.probeResultsBuffer = {
-  title      : "Measurement results store start",
-  description: "Specify the starting value of macro # variables where measurement results are stored.",
-  group      : "probing",
-  type       : "integer",
-  value      : (controlType == "NGC" ? 10100 : 150),
   scope      : "post"
 };
 properties.probeCalibratedRadius = {
   title      : "Calibrated Radius",
   description: "Macro Variable used for storing probe calibrated radi.",
-  group      : "probing",
+  group      : 99,
   type       : "integer",
   value      : (controlType == "NGC" ? 10556 : 556),
   scope      : "post"
@@ -4389,7 +4352,7 @@ properties.probeCalibratedRadius = {
 properties.probeEccentricityX = {
   title      : "Eccentricity X",
   description: "Macro Variable used for storing the X eccentricity.",
-  group      : "probing",
+  group      : 99,
   type       : "integer",
   value      : (controlType == "NGC" ? 10558 : 558),
   scope      : "post"
@@ -4397,7 +4360,7 @@ properties.probeEccentricityX = {
 properties.probeEccentricityY = {
   title      : "Eccentricity Y",
   description: "Macro Variable used for storing the Y eccentricity.",
-  group      : "probing",
+  group      : 99,
   type       : "integer",
   value      : (controlType == "NGC" ? 10559 : 559),
   scope      : "post"
@@ -4405,7 +4368,7 @@ properties.probeEccentricityY = {
 properties.probeCalibrationMethod = {
   title      : "Probe calibration Method",
   description: "Select the probe calibration method.",
-  group      : "probing",
+  group      : 99,
   type       : "enum",
   values     : [
     {id:"Renishaw", title:"Renishaw"},
@@ -4415,29 +4378,17 @@ properties.probeCalibrationMethod = {
   value: "Renishaw",
   scope: "post"
 };
-properties.useLiveConnection = {
-  title      : "Live device connection",
-  description: "Creates a live connection between the controller and Fusion 360, used for live importing of measurement results and toolpath tracking",
-  group      : "probing",
-  type       : "boolean",
-  value      : false,
-  scope      : "post"
-};
-properties.probeNumberofPoints = {
-  title      : "Measurement number of points to store",
-  description: "This is the maximum number of measurement results that can be stored in the buffer.",
-  group      : "probing",
-  type       : "integer",
-  value      : 4,
-  scope      : "post"
-};
-properties.controlConnectorVersion = {
-  title      : "Results connector version",
-  description: "Interface version for direct connection to read inspection results.",
-  group      : "probing",
-  type       : "integer",
-  value      : 1,
-  scope      : "post"
+properties.calibrationNCOutput = {
+  title      : "Calibration NC Output Type",
+  description: "Choose none if the NC program created is to be used for calibrating the probe.",
+  group      : 99,
+  type       : "enum",
+  values     : [
+    {id:"none", title:"none"},
+    {id:"Ring Gauge", title:"Ring Gauge"}
+  ],
+  value: "none",
+  scope: "post"
 };
 
 var ijkFormat = createFormat({decimals:5, forceDecimal:true});
@@ -4453,17 +4404,15 @@ var inspectionVariables = {
   probeResultsBufferIndex        : 1,
   hasInspectionSections          : false,
   inspectionSectionCount         : 0,
-  systemVariableOffsetLengthTable: 2000,
-  systemVariableOffsetWearTable  : 2200,
+  systemVariableOffsetLengthTable: 2200,
+  systemVariableOffsetWearTable  : 2000,
   workpieceOffset                : "",
   systemVariablePreviousX        : 5001,
   systemVariablePreviousY        : 5002,
   systemVariablePreviousZ        : 5003,
-  systemVariableMachineCoordX    : 5021,
-  systemVariableMachineCoordY    : 5022,
-  systemVariableMachineCoordZ    : 5023,
-  systemVariableWCSOffset        : 5200,
-  systemVariableWCSOffsetExt     : 14000,
+  systemVariableCurrentX         : 5021,
+  systemVariableCurrentY         : 5022,
+  systemVariableCurrentZ         : 5023,
 };
 
 var macroFormat = createFormat({prefix:inspectionVariables.localVariablePrefix, decimals:0});
@@ -4476,78 +4425,76 @@ var ALARM_IF_NOT_DEFLECTED = "M79";
 var NO_DEFLECTION_CHECK = "";
 
 function inspectionWriteVariables() {
-  var count = 1;
-  var prefix = inspectionVariables.localVariablePrefix;
-  inspectionVariables.probeRadius = prefix + count; // #1
-  inspectionVariables.xTarget = prefix + ++count;
-  inspectionVariables.yTarget = prefix + ++count;
-  inspectionVariables.zTarget = prefix + ++count;
-  inspectionVariables.xMeasured = prefix + ++count;
-  inspectionVariables.yMeasured = prefix + ++count;
-  inspectionVariables.zMeasured = prefix + ++count;
-  inspectionVariables.activeToolLength = prefix + ++count;
-  inspectionVariables.macroVariable1 = prefix + ++count;
-  inspectionVariables.macroVariable2 = prefix + ++count;
-  inspectionVariables.macroVariable3 = prefix + ++count;
-  inspectionVariables.macroVariable4 = prefix + ++count;
-  inspectionVariables.macroVariable5 = prefix + ++count;
-  inspectionVariables.macroVariable6 = prefix + ++count;
-  inspectionVariables.macroVariable7 = prefix + ++count;
-  inspectionVariables.wcsVectorX = prefix + ++count;
-  inspectionVariables.wcsVectorY = prefix + ++count;
-  inspectionVariables.wcsVectorZ = prefix + ++count;
-  inspectionVariables.previousWCSX = prefix + ++count;
-  inspectionVariables.previousWCSY = prefix + ++count;
-  inspectionVariables.previousWCSZ = prefix + ++count; // #21
-  // set Buffer Variable
-  if (getProperty("useLiveConnection")) {
-    var bufferCount = getProperty("probeResultsBuffer");
-    inspectionVariables.liveConnectionVersion = prefix + bufferCount; // #10100
-    inspectionVariables.liveConnectionCapacity = prefix + ++bufferCount;
-    inspectionVariables.liveConnectionReadPointer = prefix + ++bufferCount;
-    inspectionVariables.liveConnectionWritePointer = prefix + ++bufferCount;
-    inspectionVariables.liveConnectionStatus = prefix + ++bufferCount;
-    inspectionVariables.workplaneStartAddress = prefix + ++bufferCount;
-    inspectionVariables.liveConnectionWPA = prefix + ++bufferCount;
-    inspectionVariables.liveConnectionWPB = prefix + ++bufferCount;
-    inspectionVariables.liveConnectionWPC = prefix + ++bufferCount;
-    inspectionVariables.probeRadius = prefix + ++bufferCount; // override
-    inspectionVariables.commandID = prefix + ++bufferCount; // #10110
-    inspectionVariables.commandArg1 = prefix + ++bufferCount;
-    inspectionVariables.commandArg2 = prefix + ++bufferCount;
-    inspectionVariables.commandArg3 = prefix + ++bufferCount;
-    inspectionVariables.commandArg4 = prefix + ++bufferCount;
-    inspectionVariables.commandArg5 = prefix + ++bufferCount;
-    inspectionVariables.commandArg6 = prefix + ++bufferCount;
-    inspectionVariables.commandArg7 = prefix + ++bufferCount;
-    inspectionVariables.commandArg8 = prefix + ++bufferCount;
-    inspectionVariables.commandArg9 = prefix + ++bufferCount;
-    inspectionVariables.probeResultsStartAddress = ++bufferCount; // #10120
-    if (getProperty("probeResultsBuffer") <= 0) {
-      error("Probe Results Buffer start address cannot be less than or equal to zero when using a direct connection.");
-      return;
-    }
-    if (getProperty("probeResultsBuffer") <= count) {
-      error("Macro variables (" +
-        prefix + 1 + "-" + prefix + count +
-        ") and live probe results storage area (" +
-        prefix + getProperty("probeResultsBuffer") + "-" + prefix + (bufferCount) +
-        ") overlap." + EOL +
-        "The minimal allowed value for property '" + properties.probeResultsBuffer.title + "' is " + (count + 1) + "."
-      );
-      return;
-    }
-  }
   // loop through all NC stream sections to check for surface inspection
   for (var i = 0; i < getNumberOfSections(); ++i) {
     var section = getSection(i);
     if (section.strategy == "inspectSurface") {
       inspectionVariables.workpieceOffset = section.workOffset;
-      inspectionVariables.hasInspectionSections = true;
+      var count = 1;
+      var localVar = getProperty("probeLocalVar");
+      var prefix = inspectionVariables.localVariablePrefix;
+      inspectionVariables.probeRadius = prefix + count;
+      inspectionVariables.xTarget = prefix + ++count;
+      inspectionVariables.yTarget = prefix + ++count;
+      inspectionVariables.zTarget = prefix + ++count;
+      inspectionVariables.xMeasured = prefix + ++count;
+      inspectionVariables.yMeasured = prefix + ++count;
+      inspectionVariables.zMeasured = prefix + ++count;
+      inspectionVariables.activeToolLength = prefix + ++count;
+      inspectionVariables.macroVariable1 = prefix + ++count;
+      inspectionVariables.macroVariable2 = prefix + ++count;
+      inspectionVariables.macroVariable3 = prefix + ++count;
+      inspectionVariables.macroVariable4 = prefix + ++count;
+      inspectionVariables.macroVariable5 = prefix + ++count;
+      inspectionVariables.macroVariable6 = prefix + ++count;
+      inspectionVariables.macroVariable7 = prefix + ++count;
+      inspectionVariables.wcsVectorX = prefix + ++count;
+      inspectionVariables.wcsVectorY = prefix + ++count;
+      inspectionVariables.wcsVectorZ = prefix + ++count;
+      inspectionVariables.previousWCSX = prefix + ++count;
+      inspectionVariables.previousWCSY = prefix + ++count;
+      inspectionVariables.previousWCSZ = prefix + ++count;
+      if (getProperty("calibrationNCOutput") == "Ring Gauge") {
+        inspectionVariables.measuredXStartingAddress = localVar;
+        inspectionVariables.measuredYStartingAddress = localVar + 10;
+        inspectionVariables.measuredZStartingAddress = localVar + 20;
+        inspectionVariables.measuredIStartingAddress = localVar + 30;
+        inspectionVariables.measuredJStartingAddress = localVar + 40;
+        inspectionVariables.measuredKStartingAddress = localVar + 50;
+      }
       inspectionValidateInspectionSettings();
+      inspectionVariables.probeResultsReadPointer = prefix + (getProperty("probeResultsBuffer") + 2);
+      inspectionVariables.probeResultsWritePointer = prefix + (getProperty("probeResultsBuffer") + 3);
+      inspectionVariables.probeResultsCollectionActive = prefix + (getProperty("probeResultsBuffer") + 4);
+      inspectionVariables.probeResultsStartAddress = getProperty("probeResultsBuffer") + 5;
+      if (getProperty("toolOffsetType") == "geomOnly") {
+        inspectionVariables.systemVariableOffsetLengthTable = "2000";
+      }
       if (getProperty("commissioningMode")) {
         writeBlock("#3006=1" + formatComment("Inspection commissioning mode is active, when the machine is measuring correctly please disable this in the post properties"));
       }
+      if (getProperty("useDirectConnection")) {
+        // check to make sure local variables used in results buffer and inspection do not clash
+        var localStart = getProperty("probeLocalVar");
+        var localEnd = count;
+        var BufferStart = getProperty("probeResultsBuffer");
+        var bufferEnd = getProperty("probeResultsBuffer") + ((3 * getProperty("probeNumberofPoints")) + 8);
+        if ((localStart >= BufferStart && localStart <= bufferEnd) || (localEnd >= BufferStart && localEnd <= bufferEnd)) {
+          error("Local variables defined (" + prefix + localStart + "-" + prefix + localEnd +
+              ") and live probe results storage area (" + prefix + BufferStart + "-" + prefix + bufferEnd + ") overlap."
+          );
+        }
+        writeBlock(macroFormat.format(getProperty("probeResultsBuffer")) + " = " + getProperty("controlConnectorVersion"));
+        writeBlock(macroFormat.format(getProperty("probeResultsBuffer") + 1) + " = " + getProperty("probeNumberofPoints"));
+        writeBlock(inspectionVariables.probeResultsReadPointer + " = 0");
+        writeBlock(inspectionVariables.probeResultsWritePointer + " = 1");
+        writeBlock(inspectionVariables.probeResultsCollectionActive + " = 0");
+        if (getProperty("probeResultultsBuffer") == 0) {
+          error("Probe Results Buffer start address cannot be zero when using a direct connection.");
+        }
+        inspectionWriteFusionConnectorInterface("HEADER");
+      }
+      inspectionVariables.hasInspectionSections = true;
       break;
     }
   }
@@ -4555,7 +4502,11 @@ function inspectionWriteVariables() {
 
 function onProbe(status) {
   if (status) { // probe ON
-    writeBlock(mFormat.format(19));
+    if (getProperty("commissioningMode") && getProperty("calibrationNCOutput") == "Ring Gauge") {
+      writeBlock(mFormat.format(19), "R#1");
+    } else {
+      writeBlock(mFormat.format(19));
+    }
     writeBlock(getProperty("probeOnCommand")); // Command for switching the probe on
     onDwell(2);
     if (getProperty("commissioningMode")) {
@@ -4581,13 +4532,13 @@ function inspectionCycleInspect(cycle, x, y, z) {
     if (activeG254) {
       // Apply Eccentricity
       gMotionModal.reset();
-      writeBlock(gFormat.format(61)); // exact stop mode on
+      writeBlock(gFormat.format(61)); //exact stop mode on
       writeBlock(gAbsIncModal.format(91), gFormat.format(1),
         "X-" + macroFormat.format(getProperty("probeEccentricityX")),
         "Y-" + macroFormat.format(getProperty("probeEccentricityY")),
         feedOutput.format(cycle.safeFeed)
       );
-      writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
+      writeBlock(gFormat.format(103), "P1",  formatComment("LOOKAHEAD OFF"));
       inspectionGetCoordinates(true);
       inspectionCalculateTargetEndpoint(x, y, z, SAFE_MOVE_DWO);
       // move alond probing vector with DWO off
@@ -4612,7 +4563,7 @@ function inspectionCycleInspect(cycle, x, y, z) {
     inspectionCalculateTargetEndpoint(x, y, z, LINEAR_MOVE);
     inspectionWriteCycleMove(gAbsIncModal.format(90), cycle.linkFeed, LINEAR_MOVE, NO_DEFLECTION_CHECK);
     forceXYZ();
-    writeBlock(gFormat.format(64)); // exact stop mode on
+    writeBlock(gFormat.format(64)); //exact stop mode on
     return;
   }
   // measure move
@@ -4620,6 +4571,9 @@ function inspectionCycleInspect(cycle, x, y, z) {
     writeBlock("#3006=1" + formatComment("Probe is about to contact part. Axes should stop on contact"));
   }
   inspectionWriteNominalData(cycle);
+  if (getProperty("useDirectConnection")) {
+    inspectionWriteFusionConnectorInterface("MEASURE");
+  }
   inspectionCalculateTargetEndpoint(x, y, z, MEASURE_MOVE);
   var f = cycle.measureFeed;
   if (activeG254) {
@@ -4648,9 +4602,6 @@ function inspectionWriteNominalData(cycle) {
   cycle.nominalI = nv.x;
   cycle.nominalJ = nv.y;
   cycle.nominalK = nv.z;
-  if (getProperty("useLiveConnection") && controlType != "NGC") {
-    return;
-  }
   writeln("DPRNT[G800" +
     "*N" + inspectionVariables.pointNumber +
     "*X" + xyzFormat.format(cycle.nominalX) +
@@ -4709,9 +4660,9 @@ function inspectionCalculateTargetEndpoint(x, y, z, moveType) {
     inspectionWriteCycleMove(gAbsIncModal.format(91), moveType == MEASURE_MOVE ? cycle.measureFeed : cycle.safeFeed, LINEAR_MOVE, NO_DEFLECTION_CHECK);
     writeBlock(gFormat.format(255));
     writeComment("Calculate vector in WPCS");
-    writeBlock(inspectionVariables.wcsVectorX + " =" + macroFormat.format(inspectionVariables.systemVariableMachineCoordX) + "-" + inspectionVariables.previousWCSX);
-    writeBlock(inspectionVariables.wcsVectorY + " =" + macroFormat.format(inspectionVariables.systemVariableMachineCoordY) + "-" + inspectionVariables.previousWCSY);
-    writeBlock(inspectionVariables.wcsVectorZ + " =[" + macroFormat.format(inspectionVariables.systemVariableMachineCoordZ) + "-" + inspectionVariables.activeToolLength + "]-" + inspectionVariables.previousWCSZ);
+    writeBlock(inspectionVariables.wcsVectorX + " =" + macroFormat.format(inspectionVariables.systemVariableCurrentX) + "-" + inspectionVariables.previousWCSX);
+    writeBlock(inspectionVariables.wcsVectorY + " =" + macroFormat.format(inspectionVariables.systemVariableCurrentY) + "-" + inspectionVariables.previousWCSY);
+    writeBlock(inspectionVariables.wcsVectorZ + " =[" + macroFormat.format(inspectionVariables.systemVariableCurrentZ) + "-" + inspectionVariables.activeToolLength + "]-" + inspectionVariables.previousWCSZ);
     writeBlock(inspectionVariables.macroVariable4 + " =SQRT[" +
       "[" + inspectionVariables.wcsVectorX + "*" + inspectionVariables.wcsVectorX + "]" + "+" +
       "[" + inspectionVariables.wcsVectorY + "*" + inspectionVariables.wcsVectorY + "]" + "+" +
@@ -4729,7 +4680,7 @@ function inspectionCalculateTargetEndpoint(x, y, z, moveType) {
   }
 }
 
-function inspectionWriteCycleMove(absInc, _feed, moveType, triggerCheck) {
+function inspectionWriteCycleMove(absInc, feedRate, moveType, triggerCheck) {
   // writeComment("moveType = " + moveType, triggerCheck);
   var motionCommand = moveType == LINEAR_MOVE ? 1 : 31;
   gMotionModal.reset();
@@ -4738,7 +4689,7 @@ function inspectionWriteCycleMove(absInc, _feed, moveType, triggerCheck) {
     "X" + inspectionVariables.xTarget,
     "Y" + inspectionVariables.yTarget,
     "Z" + inspectionVariables.zTarget,
-    feedOutput.format(_feed),
+    feedOutput.format(feedRate),
     triggerCheck
   );
   writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
@@ -4765,63 +4716,86 @@ function inspectionProbeTriggerCheck(triggered) {
 
 function inspectionCorrectProbeMeasurement() {
   writeComment("Correct Measurements");
-  var adjustX = macroFormat.format(activeG254 ? inspectionVariables.systemVariablePreviousX : inspectionVariables.systemVariableMeasuredX);
-  var adjustY = macroFormat.format(activeG254 ? inspectionVariables.systemVariablePreviousY : inspectionVariables.systemVariableMeasuredY);
-  var adjustZ = macroFormat.format(activeG254 ? inspectionVariables.systemVariablePreviousZ : inspectionVariables.systemVariableMeasuredZ);
-
-  writeBlock(inspectionVariables.xMeasured + " =" + adjustX + "+" + macroFormat.format(getProperty("probeEccentricityX")));
-  writeBlock(inspectionVariables.yMeasured + " =" + adjustY + "+" + macroFormat.format(getProperty("probeEccentricityY")));
+  var MeasuredX = macroFormat.format(inspectionVariables.systemVariableMeasuredX);
+  var MeasuredY = macroFormat.format(inspectionVariables.systemVariableMeasuredY);
+  var MeasuredZ = macroFormat.format(inspectionVariables.systemVariableMeasuredZ);
+  if (activeG254) {
+    // Actual is previous target system parameter - with eccentricity correction
+    MeasuredX = macroFormat.format(inspectionVariables.systemVariablePreviousX);
+    MeasuredY = macroFormat.format(inspectionVariables.systemVariablePreviousY);
+    MeasuredZ = macroFormat.format(inspectionVariables.systemVariablePreviousZ);
+  }
+  writeBlock(inspectionVariables.xMeasured + " =" + MeasuredX + "+" + macroFormat.format(getProperty("probeEccentricityX")));
+  writeBlock(inspectionVariables.yMeasured + " =" + MeasuredY + "+" + macroFormat.format(getProperty("probeEccentricityY")));
   // need to consider probe centre tool output point in future too
   var correctToolLength = activeG254 ? "" : ("-" + inspectionVariables.activeToolLength);
-  writeBlock(inspectionVariables.zMeasured + " =" + adjustZ + "+" + inspectionVariables.probeRadius + correctToolLength);
+  writeBlock(inspectionVariables.zMeasured + " =" + MeasuredZ + "+" + inspectionVariables.probeRadius + correctToolLength);
+}
+
+function inspectionWriteFusionConnectorInterface(ncSection) {
+  if (ncSection == "MEASURE") {
+    writeBlock("IF " + inspectionVariables.probeResultsCollectionActive + " NE 1 GOTO " + inspectionVariables.pointNumber);
+    writeBlock("WHILE [" + inspectionVariables.probeResultsReadPointer + " EQ " + inspectionVariables.probeResultsWritePointer + "] DO 1");
+    onDwell(0.5);
+    writeComment("WAITING FOR FUSION CONNECTION");
+    writeBlock("G53");
+    writeBlock("END 1");
+    writeBlock("N" + inspectionVariables.pointNumber);
+  } else {
+    writeBlock("WHILE [" + inspectionVariables.probeResultsCollectionActive + " NE 1] DO 1");
+    onDwell(0.5);
+    writeComment("WAITING FOR FUSION CONNECTION");
+    writeBlock("G53");
+    writeBlock("END 1");
+  }
 }
 
 function inspectionCalculateDeviation() {
   var outputFormat = (unit == MM) ? "[53]" : "[44]";
-  // calculate the deviation and produce a warning if out of tolerance.
-  // (Measured + ((vector *(-1))*calibrated radi))
+  //calculate the deviation and produce a warning if out of tolerance.
+  //(Measured + ((vector *(-1))*calibrated radi))
 
   writeComment("calculate deviation");
-  // compensate for tip rad in X
+  //compensate for tip rad in X
   writeBlock(
     inspectionVariables.macroVariable1 + "=[" +
     inspectionVariables.xMeasured + "+[[" +
     ijkFormat.format(cycle.nominalI) + "*[-1]]*" +
     inspectionVariables.probeRadius + "]]"
   );
-  // compensate for tip rad in Y
+  //compensate for tip rad in Y
   writeBlock(
     inspectionVariables.macroVariable2 + "=[" +
     inspectionVariables.yMeasured + "+[[" +
     ijkFormat.format(cycle.nominalJ) + "*[-1]]*" +
     inspectionVariables.probeRadius + "]]"
   );
-  // compensate for tip rad in Z
+  //compensate for tip rad in Z
   writeBlock(
     inspectionVariables.macroVariable3 + "=[" +
     inspectionVariables.zMeasured + "+[[" +
     ijkFormat.format(cycle.nominalK) + "*[-1]]*" +
     inspectionVariables.probeRadius + "]]"
   );
-  // calculate deviation vector (Measured x - nominal x)
+  //Calculate deviation vector (Measured x - nominal x)
   writeBlock(
     inspectionVariables.macroVariable4 + "=" +
     inspectionVariables.macroVariable1 + "-" +
     xyzFormat.format(cycle.nominalX)
   );
-  // calculate deviation vector (Measured y - nominal y)
+  //Calculate deviation vector (Measured y - nominal y)
   writeBlock(
     inspectionVariables.macroVariable5 + "=" +
     inspectionVariables.macroVariable2 + "-" +
     xyzFormat.format(cycle.nominalY)
   );
-  // calculate deviation vector (Measured Z - nominal Z)
+  //Calculate deviation vector (Measured Z - nominal Z)
   writeBlock(
     inspectionVariables.macroVariable6 + "=[" +
     inspectionVariables.macroVariable3 + "-[" +
     xyzFormat.format(cycle.nominalZ) + "]]"
   );
-  // sqrt xyz.xyz this is the value of the deviation
+  //sqrt xyz.xyz this is the value of the deviation
   writeBlock(
     inspectionVariables.macroVariable7 + "=SQRT[[" +
     inspectionVariables.macroVariable4 + "*" +
@@ -4831,7 +4805,7 @@ function inspectionCalculateDeviation() {
     inspectionVariables.macroVariable6 + "*" +
     inspectionVariables.macroVariable6 + "]]"
   );
-  // sign of the vector
+  //sign of the vector
   writeBlock(
     inspectionVariables.macroVariable1 + "=[[" +
     ijkFormat.format(cycle.nominalI) + "*" +
@@ -4841,7 +4815,7 @@ function inspectionCalculateDeviation() {
     ijkFormat.format(cycle.nominalK) + "*" +
     inspectionVariables.macroVariable6 + "]]"
   );
-  // print out deviation value
+  //Print out deviation value
   forceSequenceNumbers(true);
   writeBlock(
     "IF [" + inspectionVariables.macroVariable1 + "GE0] GOTO" + skipNLines(3)
@@ -4856,18 +4830,15 @@ function inspectionCalculateDeviation() {
     inspectionVariables.macroVariable7 + "*[-1]]"
   );
   writeBlock(" ");
-
-  if (!getProperty("useLiveConnection") || controlType == "NGC") {
-    writeln(
-      "DPRNT[G802" + "*N" + inspectionVariables.pointNumber +
+  writeln(
+    "DPRNT[G802" + "*N" + inspectionVariables.pointNumber +
       "*DEVIATION*" + inspectionVariables.macroVariable4 + outputFormat + "]"
-    );
-  }
-  // tolerance check
+  );
+  //Tolerance check
   writeBlock(
     "IF [" + inspectionVariables.macroVariable4 +
-    "LT" + (xyzFormat.format(getParameter("operation:inspectUpperTolerance"))) +
-    "] GOTO" + skipNLines(3)
+     "LT" + (xyzFormat.format(getParameter("operation:inspectUpperTolerance"))) +
+     "] GOTO" + skipNLines(3)
   );
   writeBlock(
     "#3006 = 1" + formatComment("Inspection point over tolerance")
@@ -4887,23 +4858,46 @@ function inspectionCalculateDeviation() {
 
 function inspectionWriteMeasuredData() {
   var outputFormat = (unit == MM) ? "[53]" : "[44]";
-  if (!getProperty("useLiveConnection") || controlType == "NGC") {
-    writeln("DPRNT[G801" +
-      "*N" + inspectionVariables.pointNumber +
-      "*X" + inspectionVariables.xMeasured + outputFormat +
-      "*Y" + inspectionVariables.yMeasured + outputFormat +
-      "*Z" + inspectionVariables.zMeasured + outputFormat +
-      "*R" + inspectionVariables.probeRadius + outputFormat +
-      "]"
-    );
-  } else {
-    writeComment("Live connection");
-  }
-  if (cycle.outOfPositionAction == "stop-message" && !getProperty("liveConnection")) {
+  writeln("DPRNT[G801" +
+    "*N" + inspectionVariables.pointNumber +
+    "*X" + inspectionVariables.xMeasured + outputFormat +
+    "*Y" + inspectionVariables.yMeasured + outputFormat +
+    "*Z" + inspectionVariables.zMeasured + outputFormat +
+    "*R" + inspectionVariables.probeRadius + outputFormat +
+    "]"
+  );
+
+  if (cycle.outOfPositionAction == "stop-message") {
     inspectionCalculateDeviation();
   }
-  if (getProperty("useLiveConnection")) {
-    liveConnectionWriteData("inspectSurfacePoint");
+
+  if (getProperty("useDirectConnection")) {
+    var writeResultIndexX = inspectionVariables.probeResultsStartAddress + (3 * inspectionVariables.probeResultsBufferIndex);
+    var writeResultIndexY = inspectionVariables.probeResultsStartAddress + (3 * inspectionVariables.probeResultsBufferIndex) + 1;
+    var writeResultIndexZ = inspectionVariables.probeResultsStartAddress + (3 * inspectionVariables.probeResultsBufferIndex) + 2;
+
+    writeBlock(macroFormat.format(writeResultIndexX) + " = " + inspectionVariables.xMeasured);
+    writeBlock(macroFormat.format(writeResultIndexY) + " = " + inspectionVariables.yMeasured);
+    writeBlock(macroFormat.format(writeResultIndexZ) + " = " + inspectionVariables.zMeasured);
+    inspectionVariables.probeResultsBufferIndex += 1;
+    if (inspectionVariables.probeResultsBufferIndex > getProperty("probeNumberofPoints")) {
+      inspectionVariables.probeResultsBufferIndex = 0;
+    }
+    writeBlock(inspectionVariables.probeResultsWritePointer + " = " + inspectionVariables.probeResultsBufferIndex);
+  }
+  if (getProperty("commissioningMode") && (getProperty("calibrationNCOutput") == "Ring Gauge")) {
+    writeBlock(macroFormat.format(inspectionVariables.measuredXStartingAddress + inspectionVariables.pointNumber) +
+      " =" + inspectionVariables.xMeasured);
+    writeBlock(macroFormat.format(inspectionVariables.measuredYStartingAddress + inspectionVariables.pointNumber) +
+      " =" + inspectionVariables.yMeasured);
+    writeBlock(macroFormat.format(inspectionVariables.measuredZStartingAddress + inspectionVariables.pointNumber) +
+      " =" + inspectionVariables.zMeasured);
+    writeBlock(macroFormat.format(inspectionVariables.measuredIStartingAddress + inspectionVariables.pointNumber) +
+      " =" + xyzFormat.format(cycle.nominalI));
+    writeBlock(macroFormat.format(inspectionVariables.measuredJStartingAddress + inspectionVariables.pointNumber) +
+      " =" + xyzFormat.format(cycle.nominalJ));
+    writeBlock(macroFormat.format(inspectionVariables.measuredKStartingAddress + inspectionVariables.pointNumber) +
+      " =" + xyzFormat.format(cycle.nominalK));
   }
   inspectionVariables.pointNumber += 1;
 }
@@ -4921,16 +4915,14 @@ function skipNLines(n) {
 }
 
 function inspectionProcessSectionStart() {
-  writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
+  writeBlock(gFormat.format(103), "P1",  formatComment("LOOKAHEAD OFF"));
   // only write header once if user selects a single results file
   if (!isDPRNTopen || !getProperty("singleResultsFile") || (currentSection.workOffset != inspectionVariables.workpieceOffset)) {
     inspectionCreateResultsFileHeader();
     inspectionVariables.workpieceOffset = currentSection.workOffset;
   }
   // write the toolpath name as a comment
-  if (!getProperty("useLiveConnection") || controlType == "NGC") {
-    writeProbingToolpathInformation();
-  }
+  writeProbingToolpathInformation();
   inspectionWriteCADTransform();
   inspectionWriteWorkplaneTransform();
   inspectionVariables.inspectionSectionCount += 1;
@@ -4967,11 +4959,9 @@ function inspectionProcessSectionStart() {
   }
   if (getProperty("commissioningMode") && !isDPRNTopen) {
     var outputFormat = (unit == MM) ? "[53]" : "[44]";
-    if (!getProperty("useLiveConnection") || controlType == "NGC") {
-      writeln("DPRNT[CALIBRATED*RADIUS*" + inspectionVariables.probeRadius + outputFormat + "]");
-      writeln("DPRNT[ECCENTRICITY*X****" + macroFormat.format(getProperty("probeEccentricityX")) + outputFormat + "]");
-      writeln("DPRNT[ECCENTRICITY*Y****" + macroFormat.format(getProperty("probeEccentricityY")) + outputFormat + "]");
-    }
+    writeln("DPRNT[CALIBRATED*RADIUS*" + inspectionVariables.probeRadius + outputFormat + "]");
+    writeln("DPRNT[ECCENTRICITY*X****" + macroFormat.format(getProperty("probeEccentricityX")) + outputFormat + "]");
+    writeln("DPRNT[ECCENTRICITY*Y****" + macroFormat.format(getProperty("probeEccentricityY")) + outputFormat + "]");
     forceSequenceNumbers(true);
     writeBlock("IF [" + inspectionVariables.probeRadius + " NE #0] GOTO" + skipNLines(2));
     writeBlock("#3000 = 1" + formatComment("PROBE NOT CALIBRATED OR PROPERTY CALIBRATED RADIUS INCORRECT"));
@@ -5019,7 +5009,7 @@ function inspectionProcessSectionEnd() {
         writeBlock("#3006=1" + formatComment("RESULTS FILE WRITTEN TO SERIAL PORT"));
       }
     }
-    writeBlock(gFormat.format(103), "P0", formatComment("LOOKAHEAD ON"));
+    writeBlock(gFormat.format(103), "P0",  formatComment("LOOKAHEAD ON"));
   }
 }
 
@@ -5032,9 +5022,9 @@ function inspectionGetCoordinates(isApproachMove) {
   }
   writeComment("Current Point in WCS");
   writeBlock(gFormat.format(255));
-  writeBlock(inspectionVariables.previousWCSX + " =" + macroFormat.format(inspectionVariables.systemVariableMachineCoordX));
-  writeBlock(inspectionVariables.previousWCSY + " =" + macroFormat.format(inspectionVariables.systemVariableMachineCoordY));
-  writeBlock(inspectionVariables.previousWCSZ + " =" + macroFormat.format(inspectionVariables.systemVariableMachineCoordZ) + "-" + inspectionVariables.activeToolLength);
+  writeBlock(inspectionVariables.previousWCSX + " =" + macroFormat.format(inspectionVariables.systemVariableCurrentX));
+  writeBlock(inspectionVariables.previousWCSY + " =" + macroFormat.format(inspectionVariables.systemVariableCurrentY));
+  writeBlock(inspectionVariables.previousWCSZ + " =" + macroFormat.format(inspectionVariables.systemVariableCurrentZ) + "-" + inspectionVariables.activeToolLength);
   inspectionReconfirmPositionDWO(cycle.safeFeed);
 }
 
@@ -5044,323 +5034,7 @@ function inspectionReconfirmPositionDWO(f) {
   writeBlock(gFormat.format(254));
   writeBlock(gAbsIncModal.format(91), gMotionModal.format(1), "X0.0 Y0.0", feedOutput.format(f));
   writeBlock("Z0.0");
-  writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
-}
-
-function liveConnectionHeader() {
-  writeComment("Live Connection Header");
-  writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
-  writeBlock((inspectionVariables.liveConnectionVersion) + " = " + getProperty("controlConnectorVersion"));
-  writeBlock((inspectionVariables.liveConnectionCapacity) + " = " + getProperty("probeNumberofPoints"));
-  writeBlock(inspectionVariables.liveConnectionReadPointer + " = 0");
-  writeBlock(inspectionVariables.liveConnectionWritePointer + " = 1");
-  writeBlock("IF [" + inspectionVariables.liveConnectionStatus, "NE -1] THEN", inspectionVariables.liveConnectionStatus + " = 1");
-  writeBlock("IF [" + inspectionVariables.liveConnectionStatus, "EQ -1] THEN", inspectionVariables.liveConnectionStatus + " = 3");
-  writeBlock(inspectionVariables.workplaneStartAddress + " = 0");
-  writeBlock(inspectionVariables.liveConnectionWPA + " = 0");
-  writeBlock(inspectionVariables.liveConnectionWPB + " = 0");
-  writeBlock(inspectionVariables.liveConnectionWPC + " = 0");
-  if (getProperty("probeCalibrationMethod") == "Renishaw") {
-    writeBlock(inspectionVariables.probeRadius + "=[[" +
-      macroFormat.format(getProperty("probeCalibratedRadius")) + " + " +
-      macroFormat.format(getProperty("probeCalibratedRadius") + 1) + "]" + "/2]"
-    );
-  } else {
-    writeBlock(inspectionVariables.probeRadius + "=" + macroFormat.format(getProperty("probeCalibratedRadius")));
-  }
-
-  writeBlock(inspectionVariables.commandID + " = 0");
-  for (var i = 1; i <= 9; i++) {
-    writeBlock(inspectionVariables["commandArg" + i] + " = 0");
-  }
-
-  if (getProperty("probeResultsBuffer") == 0) {
-    error("Probe Results Buffer start address cannot be zero when using a live connection.");
-    return;
-  }
-  writeBlock("WHILE [" + inspectionVariables.liveConnectionStatus + " NE -1] DO1");
-  writeComment("WAITING FOR FUSION CONNECTION");
-  writeBlock(gFormat.format(53));
-  writeBlock("END1");
-
-  // LOOP THOUGH ALL THE TOOLPATHS TO GIVE THE DATA TO LIVE CONNECTION.
-  writeComment("loop though all toolpaths for live connection");
-  for (var i = 0; i < getNumberOfSections(); ++i) {
-    var value = inspectionVariables.probeResultsStartAddress + 6 * inspectionVariables.probeResultsBufferIndex;
-    var pathTypeID = macroFormat.format(value);
-    var toolpathID = macroFormat.format(value + 1);
-    var toolpathInfo1 = macroFormat.format(value + 2);
-    var toolpathInfo2 = macroFormat.format(value + 3);
-    var toolpathInfo3 = macroFormat.format(value + 4);
-    var toolpathInfo4 = macroFormat.format(value + 5);
-
-    var section = getSection(i);
-    if (section.hasParameter("autodeskcam:operation-id")) {
-      writeln("");
-      writeBlock("WHILE [[" + inspectionVariables.liveConnectionStatus + " EQ -1" +
-        "] AND [" + inspectionVariables.liveConnectionReadPointer + " EQ " + inspectionVariables.liveConnectionWritePointer + "]] DO1"
-      );
-      writeComment("WAITING FOR FUSION CONNECTION-OVERWRITE PROTECTION");
-      writeBlock(gFormat.format(53));
-      writeBlock("END1");
-      writeBlock(pathTypeID + " = 0"); // Path type set to 0 as this is an Information data block
-      writeBlock(toolpathID + " = " + section.getParameter("autodeskcam:operation-id"));
-      writeBlock(toolpathInfo1 + " = 0"); // notice type record
-      writeBlock(toolpathInfo2 + " = 0", formatComment("tool length")); // length
-      writeBlock(toolpathInfo3 + " = 0", formatComment("tool radius")); // radius
-      writeBlock(toolpathInfo4 + " = 0");
-      inspectionVariables.probeResultsBufferIndex += 1;
-
-      if (inspectionVariables.probeResultsBufferIndex > getProperty("probeNumberofPoints")) {
-        inspectionVariables.probeResultsBufferIndex = 0;
-      }
-      writeBlock(inspectionVariables.liveConnectionWritePointer + " = " + inspectionVariables.probeResultsBufferIndex);
-    }
-  }
-  writeBlock(gFormat.format(103), "P0", formatComment("LOOKAHEAD ON"));
-}
-
-// Store X value for size and position
-function liveConnectionStoreResults() {
-  writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
-  writeBlock(inspectionVariables.commandArg8, "=", macroFormat.format(135)); // Store X position
-  writeBlock(inspectionVariables.commandArg9, "=", macroFormat.format(138)); // Store X size
-  writeBlock(gFormat.format(103), "P0", formatComment("LOOKAHEAD ON"));
-}
-
-function liveConnectionWriteData(type) {
-  var pathTypeValue; // path types 0=Information / 1=inspect surface / 2=macro inspection / 3=milling / 4=additive
-  if (isInspectionOperation()) {
-    pathTypeValue = 1;
-  } else if (isProbeOperation()) {
-    pathTypeValue = 2;
-  } else {
-    pathTypeValue = 3; // if its anything else than inspection, path type=3 i.e milling
-  }
-  var value = inspectionVariables.probeResultsStartAddress + 6 * inspectionVariables.probeResultsBufferIndex;
-  var pathTypeID = macroFormat.format(value);
-  var toolpathID = macroFormat.format(value + 1);
-  var toolpathInfo1 = macroFormat.format(value + 2);
-  var toolpathInfo2 = macroFormat.format(value + 3);
-  var toolpathInfo3 = macroFormat.format(value + 4);
-  var toolpathInfo4 = macroFormat.format(value + 5);
-
-  writeln("");
-  liveConnectorInterface("overwriteProtection");
-  writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
-  switch (type) {
-  case "toolpathStart":
-    writeComment("Toolpath Start Live Import");
-    writeBlock(pathTypeID + " = 0"); // record type
-    writeBlock(toolpathID + " = " + getParameter("autodeskcam:operation-id"));
-    writeBlock(toolpathInfo1 + " =  1"); // information type, 1 = "start" record, 2 = end record, 3 = part alignment
-    writeBlock(toolpathInfo2 + " = #3012"); // HH-MM-SS 235,959 (max value)
-    writeBlock(toolpathInfo3 + " = 0");
-    writeBlock(toolpathInfo4 + " = 0");
-    inspectionVariables.probeResultsBufferIndex += 1;
-    break;
-  case "toolpathEnd":
-    writeComment("Toolpath End Live Import");
-    writeBlock(pathTypeID + " = 0");
-    writeBlock(toolpathID + " = " + getParameter("autodeskcam:operation-id"));
-    writeBlock(inspectionVariables.commandArg1 + " = " + getParameter("autodeskcam:operation-id")); // store toolpath ID in cmd arg 1 for part alignment
-    writeBlock(toolpathInfo1 + " = 2");
-    writeBlock(toolpathInfo2 + " = #3012");
-    writeBlock(toolpathInfo3 + " = 0");
-    writeBlock(toolpathInfo4 + " = 0");
-    inspectionVariables.probeResultsBufferIndex += 1;
-    break;
-  case "toolpathAlignment":
-    writeComment("Toolpath Alignment Live Import");
-    writeBlock(pathTypeID + " = 0");
-    writeBlock(toolpathID + " = " + inspectionVariables.commandArg1);
-    writeBlock(toolpathInfo1 + " =  3");
-    writeBlock(toolpathInfo2 + " = 0");
-    writeBlock(toolpathInfo3 + " = 0");
-    writeBlock(toolpathInfo4 + " = 0");
-    inspectionVariables.probeResultsBufferIndex += 1;
-    break;
-  case "milling":
-    writeComment("Milling Toolpath Live Import");
-    writeBlock(pathTypeID + " = " + pathTypeValue);
-    writeBlock(toolpathID + " = " + getParameter("autodeskcam:operation-id"));
-    writeBlock(toolpathInfo1 + " = 0");
-    writeBlock(toolpathInfo2 + " = 0");
-    writeBlock(toolpathInfo3 + " = 0");
-    writeBlock(toolpathInfo4 + " = 0");
-    inspectionVariables.probeResultsBufferIndex += 1;
-    break;
-  case "inspectSurfacePoint":
-    writeComment("Inspect Surface Point Live Import");
-    writeBlock(pathTypeID + " = " + pathTypeValue);
-    writeBlock(toolpathID + " = " + getParameter("autodeskcam:operation-id"));
-    writeBlock(toolpathInfo1 + " = " + cycle.pointID);
-    writeBlock(toolpathInfo2 + " = " + inspectionVariables.xMeasured);
-    writeBlock(toolpathInfo3 + " = " + inspectionVariables.yMeasured);
-    writeBlock(toolpathInfo4 + " = " + inspectionVariables.zMeasured);
-    inspectionVariables.probeResultsBufferIndex += 1;
-    break;
-  case "inspectSurfaceAlarm":
-    writeBlock("IF [" + inspectionVariables.commandID + " EQ 2] THEN " + inspectionVariables.commandID + "= -2");
-    writeBlock("IF [[" + inspectionVariables.commandID + " EQ -2] AND [" + inspectionVariables.commandArg1 + " EQ 1]] THEN #3006 = 1 (OUT_OF_TOLERANCE)");
-    writeBlock("IF [[" + inspectionVariables.commandID + " EQ -2] AND [" + inspectionVariables.commandArg1 + " EQ 2]] THEN #3006 = 1 (-OUT_OF_TOLERANCE-)"); // Point unprojected alarm
-    writeBlock("IF [[" + inspectionVariables.commandID + " EQ -2] AND [" + inspectionVariables.commandArg1 + " EQ 3]] THEN #3006 = 1 (PART_ALIGNMENT_ALARM)");
-    writeBlock("IF [[" + inspectionVariables.commandID + " EQ -2] AND [" + inspectionVariables.commandArg1 + " EQ 4]] THEN #3006 = 1 (UNSPECIFIED)");
-    writeBlock("IF [" + inspectionVariables.commandID + " EQ -2] THEN " + inspectionVariables.commandID + " = 0");
-    break;
-  case "macroEnd":
-    var macroType = 0.009;
-    var data1 = 0;
-    var data2 = 0;
-    var data3 = 0;
-    var data4 = 0;
-    switch (cycleType) {
-    case "probing-x":
-      macroType = 0.001;
-      data1 = (macroFormat.format(188));
-      data2 = (macroFormat.format(185));
-      break;
-    case "probing-y":
-      macroType = 0.002;
-      data1 = (macroFormat.format(188));
-      data3 = (macroFormat.format(186));
-      break;
-    case "probing-z":
-      macroType = 0.003;
-      data1 = (macroFormat.format(188));
-      data4 = (macroFormat.format(187));
-      break;
-    case "probing-xy-circular-boss":
-    case "probing-xy-circular-hole":
-    case "probing-xy-circular-partial-boss":
-    case "probing-xy-circular-partial-hole":
-    case "probing-xy-circular-hole-with-island":
-    case "probing-xy-circular-partial-hole-with-island":
-      macroType = 0.004;
-      data1 = (macroFormat.format(188)); // Diameter
-      data2 = (macroFormat.format(185)); // X position
-      data3 = (macroFormat.format(186)); // Y Position
-      break;
-    case "probing-xy-rectangular-boss":
-    case "probing-xy-rectangular-hole":
-    case "probing-xy-rectangular-hole-with-island":
-      macroType = 0.005;
-      data1 = (inspectionVariables.commandArg9); // X size
-      data2 = (inspectionVariables.commandArg8); // X position
-      data3 = (macroFormat.format(186)); // Y position
-      data4 = (macroFormat.format(188)); // Y size
-      break;
-    case "probing-x-wall":
-    case "probing-x-channel":
-    case "probing-x-channel-with-island":
-      macroType = 0.006;
-      data1 = (macroFormat.format(185)); // X size
-      data2 = (macroFormat.format(188)); // X position
-      break;
-    case "probing-y-wall":
-    case "probing-y-channel":
-    case "probing-y-channel-with-island":
-      macroType = 0.007;
-      data3 = (macroFormat.format(186)); // Y position
-      data4 = (macroFormat.format(188)); // Y size
-      break;
-    default:
-      warning("This probing macro is not yet operated by Live connection");
-      return;
-    }
-    writeComment("Macro Inspection Live Import");
-    writeBlock(pathTypeID + " =" + (pathTypeValue + macroType + 0.00001));
-    writeBlock(toolpathID + " = " + getParameter("autodeskcam:operation-id"));
-    writeBlock(toolpathInfo1 + " = " + data1);
-    writeBlock(toolpathInfo2 + " = " + data2);
-    writeBlock(toolpathInfo3 + " = " + data3);
-    writeBlock(toolpathInfo4 + " = " + data4);
-    inspectionVariables.probeResultsBufferIndex += 1;
-    break;
-  }
-
-  if (inspectionVariables.probeResultsBufferIndex > getProperty("probeNumberofPoints")) {
-    inspectionVariables.probeResultsBufferIndex = 0;
-  }
-  writeBlock(inspectionVariables.liveConnectionWritePointer + " = " + inspectionVariables.probeResultsBufferIndex);
-  writeBlock(gFormat.format(103), "P0", formatComment("LOOKAHEAD ON"));
-}
-
-function liveConnectorInterface(type) {
-  switch (type) {
-  case "overwriteProtection":
-    writeBlock(
-      "WHILE [[" + inspectionVariables.liveConnectionStatus + " EQ -1" +
-      "] AND [" + inspectionVariables.liveConnectionReadPointer + " EQ " + inspectionVariables.liveConnectionWritePointer + "]] DO1"
-    );
-    writeComment("WAITING FOR FUSION CONNECTION");
-    writeBlock(gFormat.format(53));
-    writeBlock("END1");
-    break;
-  case "WORKPLANE":
-    var orientation = (machineConfiguration.isMultiAxisConfiguration() && currentMachineABC != undefined) ? machineConfiguration.getOrientation(currentMachineABC) : currentSection.workPlane;
-    var abc = orientation.getEuler2(EULER_XYZ_S);
-    writeBlock(
-      "WHILE [[" + inspectionVariables.workplaneStartAddress + " NE 0] AND [[" +
-      inspectionVariables.liveConnectionWPA, "NE", abcFormat.format(abc.x) + "] OR [" +
-      inspectionVariables.liveConnectionWPB, "NE", abcFormat.format(abc.y) + "] OR [" +
-      inspectionVariables.liveConnectionWPC, "NE", abcFormat.format(abc.z) + "]]] DO1"
-    );
-    writeComment("WAITING FOR FUSION CONNECTION WORKPLANE READ");
-    writeBlock(gFormat.format(53));
-    writeBlock("END1");
-    writeBlock(
-      "IF [[" +
-      inspectionVariables.liveConnectionWPA, "NE", abcFormat.format(abc.x) + "] OR [" +
-      inspectionVariables.liveConnectionWPB, "NE", abcFormat.format(abc.y) + "] OR [" +
-      inspectionVariables.liveConnectionWPC, "NE", abcFormat.format(abc.z) + "]] THEN " +
-      inspectionVariables.workplaneStartAddress, "= -1"
-    );
-    break;
-  }
-}
-
-function onLiveAlignment() {
-  var workOffset = (currentWorkOffset == 0 ? 1 : currentWorkOffset);
-  var nextWorkOffset = hasNextSection() ? getNextSection().workOffset == 0 ? 1 : getNextSection().workOffset : -1;
-  if (workOffset == nextWorkOffset) {
-    currentWorkOffset = undefined;
-  }
-  var standardRange = 6;
-  var systemWCS = (workOffset > standardRange ? inspectionVariables.systemVariableWCSOffsetExt : inspectionVariables.systemVariableWCSOffset);
-  systemWCS += (workOffset > standardRange ? (workOffset - (standardRange + 1)) : workOffset) * 20;
-
-  var liveAlignmentOffset = {
-    x: macroFormat.format(systemWCS + 1),
-    y: macroFormat.format(systemWCS + 2),
-    z: macroFormat.format(systemWCS + 3),
-    a: macroFormat.format(systemWCS + 4),
-    b: macroFormat.format(systemWCS + 5),
-    c: macroFormat.format(systemWCS + 6),
-  };
-
-  writeln("");
-  writeBlock(gFormat.format(103), "P1", formatComment("LOOKAHEAD OFF"));
-  liveConnectionWriteData("toolpathAlignment");
-
-  writeBlock("WHILE [" + inspectionVariables.commandID + " NE 3] DO1");
-  writeComment("WAITING FOR WCS UPDATE");
-  writeBlock(gFormat.format(53));
-  writeBlock("IF [" + inspectionVariables.commandID + " EQ 2] THEN " + inspectionVariables.commandID + "= -2");
-  writeBlock("IF [[" + inspectionVariables.commandID + " EQ -2] AND [" + inspectionVariables.commandArg1 + " EQ 3]] THEN #3006 = 1 (PART_ALIGNMENT_ALARM)");
-  writeBlock("IF [[" + inspectionVariables.commandID + " EQ -2] AND [" + inspectionVariables.commandArg1 + " EQ 3]] THEN " + inspectionVariables.liveConnectionStatus, "= 2"); //If using live connection set Results active to a 2 to signify program end
-  writeBlock("IF [" + inspectionVariables.commandID + " EQ -2] THEN " + inspectionVariables.commandID + " = 0"); // Clear Alarm
-  writeBlock("IF [[" + inspectionVariables.liveConnectionStatus + " EQ 2] AND [" + inspectionVariables.commandArg1 + " EQ 3]] THEN M30");
-  writeBlock("END1");
-
-  writeBlock(liveAlignmentOffset.x + " = " + liveAlignmentOffset.x + "-" + inspectionVariables.commandArg1);
-  writeBlock(liveAlignmentOffset.y + " = " + liveAlignmentOffset.y + "-" + inspectionVariables.commandArg2);
-  writeBlock(liveAlignmentOffset.z + " = " + liveAlignmentOffset.z + "-" + inspectionVariables.commandArg3);
-  writeBlock(liveAlignmentOffset.a + " = " + liveAlignmentOffset.a + "-" + inspectionVariables.commandArg4);
-  writeBlock(liveAlignmentOffset.b + " = " + liveAlignmentOffset.b + "-" + inspectionVariables.commandArg5);
-  writeBlock(liveAlignmentOffset.c + " = " + liveAlignmentOffset.c + "-" + inspectionVariables.commandArg6);
-  writeBlock("IF [" + inspectionVariables.commandID + " EQ 3] THEN " + inspectionVariables.commandID + " = 0");
-  writeBlock(gFormat.format(103), "P0", formatComment("LOOKAHEAD ON"));
+  writeBlock(gFormat.format(103), "P1",  formatComment("LOOKAHEAD OFF"));
 }
 // <<<<< INCLUDED FROM ../common/haas base inspection.cps
 
