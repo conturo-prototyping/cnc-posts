@@ -4260,8 +4260,9 @@ function setProperty(property, value) {
 // <<<<< INCLUDED FROM ../../../haas next generation.cps
 
 capabilities |= CAPABILITY_INSPECTION;
-description = "HAAS - Next Generation Control Inspect Surface";
-longDescription = "Generic post for the HAAS Next Generation control with inspect surface capabilities.";
+description = "CP - HAAS - Mill - NGC";
+longDescription = "Generic post modified and managed by Conturo Prototyping for HAAS NGC with inspect surface. Built from Fusion V43573. See forum thread https://forum.shopq.io/t/post-haas-ngc-inspect-surface/92 for feature requests and complaints." ;
+
 
 var controlType = "NGC"; // Specifies the control model "NGC" or "Classic"
 // >>>>> INCLUDED FROM ../common/haas base inspection.cps
