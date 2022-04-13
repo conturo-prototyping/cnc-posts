@@ -4,8 +4,10 @@
 
   HAAS Lathe post processor configuration.
 
-  $Revision: 3 $
+  $Revision: 4 $
 
+V1 added adc 3-28-2022
+- orginal fusion 360 post 43699
 
 
 
@@ -16,6 +18,11 @@ V3 changed adc 3-28-2022
   -write tools to true  
   -write numbers to true
 
+V4 Changed adc 3-29-2022
+  -moved vars for Y axis and door
+  -added button for "has y axis"
+  -defined gotyaxis = property of "has Y axis " button
+  -changed funtion of got live tool to elimante Y axis output
 */
 
 description = "CP - Haas - Lathe - All";
@@ -337,6 +344,14 @@ properties = {
     value      : true,
     scope      : "post"
   },
+  /*hasYaxis: {
+    title      : "Got Y Axis",
+    description: "Specifies if the machine has Y Axis.",
+    group      : "configuration",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },*/
   looping: {
     title       : "Use M97 looping",
     description : "Output program for M97 looping.",
@@ -414,6 +429,20 @@ wcsDefinitions = {
     {name:"Extended", format:"G154 P", range:[1, 99]}
   ]
 };
+//added 3-28-2022 adam
+var gotBAxis = false; // B-axis always requires customization to match the machine specific functions for doing rotations
+var gotMultiTurret = false; // specifies if the machine has several turrets
+
+var gotDoorControl = false;
+
+// Declaring y axis variables here, but they are not initialized until onOpen() executes
+// because getProperty() does not seem to return anything until that functions runs.
+// i.e. getProperty('hasYaxis') is undefined until onOpen() is done reading the user
+// input properties.
+var gotYAxis;
+var yAxisMaximum;
+var yAxisMaximum;
+//added above
 
 var permittedCommentChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,=_-";
 
@@ -975,6 +1004,10 @@ var machineConfigurationMainSpindle;
 var machineConfigurationSubSpindle;
 
 function onOpen() {
+  gotYAxis = getProperty("gotLiveTooling");
+  yAxisMinimum = toPreciseUnit(gotYAxis ? -50.8 : 0, MM); // specifies the minimum range for the Y-axis
+  yAxisMaximum = toPreciseUnit(gotYAxis ? 50.8 : 0, MM); // specifies the maximum range for the Y-axis
+
   if (getProperty("useRadius")) {
     maximumCircularSweep = toRad(90); // avoid potential center calculation errors for CNC
   }
@@ -4239,11 +4272,11 @@ function onClose() {
   if (ejectRoutine) {
     ejectPart();
   }
-
-  if (gotYAxis) {
+//Removed extra Yaxis home move on close
+  /*if (gotYAxis) {
     writeBlock(gFormat.format(53), gMotionModal.format(0), "Y" + yFormat.format(getProperty("g53HomePositionY")));
     yOutput.reset();
-  }
+  }*/
 
   if (getProperty("useBarFeeder")) {
     writeln("");
