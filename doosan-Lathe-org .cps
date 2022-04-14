@@ -10,7 +10,37 @@
   FORKID {2B0CAB1F-F8A9-422B-A792-DA2D43D60569}
 */
 
-description = "Doosan Turning";
+
+/*
+V1.1 added Adc 8-2021
+  -added chip conveyor
+
+V1.2 added Adc 8-2021
+  -Added mist collector
+
+V1.3 added Adc 10-2021
+    -fixed drill pecking issue
+    -default G81 drill cycle ovewrites to G83 with 0.0 peck depth
+
+V1.4 added Adc 10-2021
+    -fixed values for the drill pecking and dwell.
+    -removed the decimal from the code.  would alarm when "Q" had decimal
+
+V1.5 added Adc 1-7-2022
+    -username + date + time
+
+V1.6 added Adc 4-13-2022
+    -added second postion for tool changes. 
+    -set G130 at machine and uses G30 instead of G28 for home postion
+    -G28 still works on tailstock home and pass thru as well
+
+V1.7 Added Adc 4-14-2022
+    -updated post merged with older post changes
+  
+*/
+
+
+description = "CP-Doosan-Lathe-V1.7 2022";
 vendor = "Doosan";
 vendorUrl = "https://www.doosanmachinetools.com";
 
@@ -63,11 +93,11 @@ properties = {
   safePositionMethod: {
     title      : "Safe Retracts",
     description: "Select your desired retract option.",
-    type       : "enum",
-    group      : "homePositions",
-    values     : [
-      {title:"G28", id:"G28"},
-      {title:"G53", id:"G53"}
+    type: "enum",
+    group:     : "homePositions",
+    values: [
+      {title: "G28", id: "G28"},
+      {title: "G30", id: "G30"}
     ],
     value: "G28",
     scope: "post"
@@ -118,6 +148,22 @@ properties = {
     type       : "boolean",
     value      : true,
     scope      : "post"
+  },
+  gotChipConveyor: {
+    title: "Got chip conveyor",
+    description: "Specifies whether to use a chip conveyor.",
+    group      : "preferences",
+    type: "boolean",
+    value: false,
+    scope: "post"
+  },
+  gotMistCollector: {
+    title: "Got mist collector",
+    description: "Specifies whether to use a mist collector.",
+    group      : "preferences",
+    type: "boolean",
+    value: true,
+    scope: "post"
   },
   o8: {
     title      : "8 Digit program number",
@@ -182,16 +228,16 @@ properties = {
     scope      : "post"
   },
   homePositionX: {
-    title      : "G53 home position X",
-    description: "G53 X-axis home position.",
+    title      : "G30 home position X",
+    description: "G30 X-axis home position.",
     group      : "homePositions",
     type       : "number",
     value      : 0,
     scope      : "post"
   },
   homePositionZ: {
-    title      : "G53 home position Z",
-    description: "G53 Z-axis home position.",
+    title      : "G30 home position Z",
+    description: "G30 Z-axis home position.",
     group      : "homePositions",
     type       : "number",
     value      : 0,
@@ -246,7 +292,7 @@ var coolants = [
   {id:COOLANT_OFF, off:9}
 ];
 
-var permittedCommentChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,=_-";
+var permittedCommentChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,=_-:";
 
 var gFormat = createFormat({prefix:"G", decimals:1});
 var mFormat = createFormat({prefix:"M", decimals:1});
@@ -331,10 +377,10 @@ function getCode(code) {
   // return mFormat.format(SPECIFY YOUR CODE HERE);
   // case "PART_CATCHER_OFF":
   // return mFormat.format(SPECIFY YOUR CODE HERE);
-  // case "TAILSTOCK_ON":
-  // return mFormat.format(SPECIFY YOUR CODE HERE);
-  // case "TAILSTOCK_OFF":
-  // return mFormat.format(SPECIFY YOUR CODE HERE);
+  //case "TAILSTOCK_ON":
+  //return mFormat.format(78);
+  //case "TAILSTOCK_OFF":
+  //return mFormat.format(79);
   // case "ENGAGE_C_AXIS":
   // machineState.cAxisIsEngaged = true;
   // return cAxisEngageModal.format(UNSUPPORTED);
@@ -414,10 +460,14 @@ function getCode(code) {
   // case "SPINDLE_SYNCHRONIZATION_OFF":
     // machineState.spindleSynchronizationIsActive = false;
     // return gSynchronizedSpindleModal.format(UNSUPPORTED);
-  // case "START_CHIP_TRANSPORT":
-    // return mFormat.format(UNSUPPORTED);
-  // case "STOP_CHIP_TRANSPORT":
-    // return mFormat.format(UNSUPPORTED);
+  case "START_CHIP_TRANSPORT":
+     return mFormat.format(24);
+  case "STOP_CHIP_TRANSPORT":
+     return mFormat.format(25);
+  case "MIST_COLLECTOR_ON":
+     return mFormat.format(132);
+  case "MIST_COLLECTOR_OFF":
+     return mFormat.format(133);
   // case "OPEN_DOOR":
     // return mFormat.format(UNSUPPORTED);
   // case "CLOSE_DOOR":
@@ -568,6 +618,33 @@ function onOpen() {
     }
   }
 
+// added user name & date + time adc-1-1-2022
+
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date	and time of computer
+  {
+    const d = new Date();
+    const h = d.getHours();
+    const hrs_12 = h > 12 ? h - 12 : h;
+    const m = d.getMinutes();
+    const pm_am = h > 12 ? 'PM' : 'AM';
+
+    writeComment(
+      'Posted: ' +
+        d.toLocaleDateString() + ' ' +
+        hrs_12 + ':' + m + ' ' + pm_am
+    )
+    ;
+     // writeComment('Posted: ' + new Date().toLocaleString()
+   // )
+  }  
+
   if ((getNumberOfSections() > 0) && (getSection(0).workOffset == 0)) {
     for (var i = 0; i < getNumberOfSections(); ++i) {
       if (getSection(i).workOffset > 0) {
@@ -621,6 +698,16 @@ function onOpen() {
     break;
   }
 
+   //chips moving maybe?
+ if (getProperty("gotChipConveyor")) {
+  writeBlock(mFormat.format(24));
+}
+
+   //Mist Collector maybe?
+ if (getProperty("gotMistCollector")) {
+  writeBlock(mFormat.format(132));
+}
+
   writeBlock(gFormat.format(getProperty("type") == "A" ? 50 : 92), sOutput.format(getProperty("maximumSpindleSpeed")));
 
   onCommand(COMMAND_START_CHIP_TRANSPORT);
@@ -628,6 +715,10 @@ function onOpen() {
 
 function onComment(message) {
   writeComment(message);
+}
+
+function onPassThrough(text) {
+  writeBlock(text);
 }
 
 /** Force output of X, Y, and Z. */
@@ -1816,10 +1907,16 @@ function onCommand(command) {
   case COMMAND_UNLOCK_MULTI_AXIS:
     break;
   case COMMAND_START_CHIP_TRANSPORT:
-    // getCode("START_CHIP_TRANSPORT");
+    writeBlock(getCode("START_CHIP_TRANSPORT"));
     break;
   case COMMAND_STOP_CHIP_TRANSPORT:
-    // getCode("STOP_CHIP_TRANSPORT");
+    writeBlock(getCode("STOP_CHIP_TRANSPORT"));
+    break;
+  //case COMMAND_MIST_COLLECTOR_ON:
+    writeBlock(getCode("MIST_COLLECTOR_ON"));
+    break;
+  //case COMMAND_MIST_COLLECTOR_OFF:
+    writeBlock(getCode("MIST_COLLECTOR_OFF"));
     break;
   case COMMAND_BREAK_CONTROL:
     break;
@@ -1967,24 +2064,24 @@ function writeRetract() {
   for (var i = 0; i < retractAxes.length; ++i) {
     switch (retractAxes[i]) {
     case X:
-      words.push((method == "G28" ? "U" : "X") + xFormat.format(_xHome));
+      words.push(((method == "G28" || method == "G30") ? "U" : "X") + xFormat.format(_xHome));
       retracted[X] = true;
       xOutput.reset();
       break;
     case Y:
       if (yOutput.isEnabled()) {
-        words.push((method == "G28" ? "V" : "Y") + yFormat.format(_yHome));
+        words.push(((method == "G28" || method == "G30") ? "V" : "Y") + yFormat.format(_yHome));
         yOutput.reset();
       }
       break;
     case Z:
-      words.push((method == "G28" ? "W" : "Z") + zFormat.format(_zHome));
+      words.push(((method == "G28" || method == "G30") ? "W" : "Z") + zFormat.format(_zHome));
       retracted[Z] = true;
       zOutput.reset();
       break;
     case XZ:
-      words.push((method == "G28" ? "U" : "X") + xFormat.format(_xHome));
-      words.push((method == "G28" ? "W" : "Z") + zFormat.format(_zHome));
+      words.push(((method == "G28" || method == "G30") ? "U" : "X") + xFormat.format(_xHome));
+      words.push(((method == "G28" || method == "G30") ? "W" : "Z") + zFormat.format(_zHome));
       retracted[X] = true;
       retracted[Z] = true;
       xOutput.reset();
@@ -2001,9 +2098,9 @@ function writeRetract() {
       gAbsIncModal.reset();
       writeBlock(gFormat.format(28), singleLineRetract ? words : words[i]);
       break;
-    case "G53":
+    case "G30":
       gMotionModal.reset();
-      writeBlock(gFormat.format(53), gMotionModal.format(0), singleLineRetract ? words : words[i]);
+      writeBlock(gFormat.format(30), gMotionModal.format(0), singleLineRetract ? words : words[i]);
       break;
     default:
       error(localize("Unsupported safe position method."));
@@ -2024,6 +2121,11 @@ function onClose() {
   onCommand(COMMAND_COOLANT_OFF);
 
   onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+  }
+
+  if (getProperty("gotMistCollector")) {
+    writeBlock(mFormat.format(133));
+  }
 
   // we might want to retract in Z before X
   // writeBlock(gFormat.format(28), "U" + xFormat.format(0)); // retract
