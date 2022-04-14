@@ -39,6 +39,7 @@ V1.7 Added Adc 4-14-2022
 
 V1.8 added Adc 4-14-2022
   -changed default max spindle from 6k to 3k
+  -changed write tool and machine to true
   
 */
 
@@ -82,7 +83,7 @@ properties = {
     description: "Output the machine settings in the header of the code.",
     group      : "formats",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   writeTools: {
@@ -90,7 +91,7 @@ properties = {
     description: "Output a tool list in the header of the code.",
     group      : "formats",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   safePositionMethod: {
