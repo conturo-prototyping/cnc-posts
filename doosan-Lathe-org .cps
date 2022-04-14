@@ -4,7 +4,7 @@
 
   Doosan Lathe post processor configuration.
 
-  $Revision: 43725 1654000cf4b49699c85c4609a7371d9af234b038 $
+  $Revision: 7 43725 1654000cf4b49699c85c4609a7371d9af234b038 $
   $Date: 2022-03-29 15:59:01 $
 
   FORKID {2B0CAB1F-F8A9-422B-A792-DA2D43D60569}
@@ -94,7 +94,7 @@ properties = {
     title      : "Safe Retracts",
     description: "Select your desired retract option.",
     type: "enum",
-    group:     : "homePositions",
+    group      : "homePositions",
     values: [
       {title: "G28", id: "G28"},
       {title: "G30", id: "G30"}
@@ -2129,7 +2129,7 @@ function onClose() {
 
   // we might want to retract in Z before X
   // writeBlock(gFormat.format(28), "U" + xFormat.format(0)); // retract
-
+{
   forceXYZ();
   writeRetract();// change this to writeRetract(XZ) to force retract in XZ at the end of the program as a default
 
