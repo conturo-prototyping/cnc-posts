@@ -4,7 +4,7 @@
 
   Doosan Lathe post processor configuration.
 
-  $Revision: 7 43725 1654000cf4b49699c85c4609a7371d9af234b038 $
+  $Revision: 8 - 43725 1654000cf4b49699c85c4609a7371d9af234b038 $
   $Date: 2022-03-29 15:59:01 $
 
   FORKID {2B0CAB1F-F8A9-422B-A792-DA2D43D60569}
@@ -36,6 +36,9 @@ V1.6 added Adc 4-13-2022
 
 V1.7 Added Adc 4-14-2022
     -updated post merged with older post changes
+
+V1.8 added Adc 4-14-2022
+  -changed default max spindle from 6k to 3k
   
 */
 
@@ -195,7 +198,7 @@ properties = {
     group      : "preferences",
     type       : "integer",
     range      : [0, 999999999],
-    value      : 6000,
+    value      : 3000,
     scope      : "post"
   },
   type: {
