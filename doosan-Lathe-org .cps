@@ -40,7 +40,7 @@ V1.7 Added Adc 4-14-2022
 */
 
 
-description = "CP-Doosan-Lathe-V1.7 2022";
+description = "CP-Doosan-Lathe-V7 2022";
 vendor = "Doosan";
 vendorUrl = "https://www.doosanmachinetools.com";
 
