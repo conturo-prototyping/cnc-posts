@@ -2152,3 +2152,4 @@ function setProperty(property, value) {
   properties[property].current = value;
 }
 // <<<<< INCLUDED FROM ../common/fanuc lathe.cps
+}
