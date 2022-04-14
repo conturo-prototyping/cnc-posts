@@ -93,9 +93,9 @@ properties = {
   safePositionMethod: {
     title      : "Safe Retracts",
     description: "Select your desired retract option.",
-    type: "enum",
+    type       : "enum",
     group      : "homePositions",
-    values: [
+    values     : [
       {title: "G28", id: "G28"},
       {title: "G30", id: "G30"}
     ],
@@ -150,20 +150,20 @@ properties = {
     scope      : "post"
   },
   gotChipConveyor: {
-    title: "Got chip conveyor",
+    title      : "Got chip conveyor",
     description: "Specifies whether to use a chip conveyor.",
     group      : "preferences",
-    type: "boolean",
-    value: false,
-    scope: "post"
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
   },
   gotMistCollector: {
-    title: "Got mist collector",
+    title      : "Got mist collector",
     description: "Specifies whether to use a mist collector.",
     group      : "preferences",
-    type: "boolean",
-    value: true,
-    scope: "post"
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
   },
   o8: {
     title      : "8 Digit program number",
@@ -314,8 +314,11 @@ var milliFormat = createFormat({decimals:0}); // milliseconds // range 1-9999
 var taperFormat = createFormat({decimals:1, scale:DEG});
 var threadP1Format = createFormat({decimals:0, forceDecimal:false, trim:false, width:6, zeropad:true});
 var threadPQFormat = createFormat({decimals:0, forceDecimal:false, trim:true, scale:(unit == MM ? 1000 : 10000)});
-var peckFormat = createFormat({decimals:(unit == MM ? 3 : 4), forceDecimal:true});
-// var peckFormat = createFormat({decimals:0, forceDecimal:false, trim:false, width:4, zeropad:true, scale:(unit == MM ? 1000 : 10000)});
+
+//fixed issue with peck
+//changed var peckformat (below) to eliminate decimal from peck cycles. was outputting "Q" with decimal and caused alarm NC-PS0007
+//var peckFormat = createFormat({decimals:(unit == MM ? 3 : 4), forceDecimal:true});
+var peckFormat = createFormat({decimals:0, forceDecimal:false, trim:false, width:4, zeropad:true, scale:(unit == MM ? 1000 : 10000)});
 
 var xOutput; // xOutput is defined in setDirectionX()
 var yOutput = createVariable({prefix:"Y"}, yFormat);
@@ -1545,10 +1548,12 @@ function onCyclePoint(x, y, z) {
     var F = cycle.feedrate;
     var P = !cycle.dwell ? 0 : clamp(1, cycle.dwell * 1000, 99999999); // in milliseconds
 
+    //changed "drilling" G81 to G83 temp. 10/20/2021 ADC
+
     switch (cycleType) {
     case "drilling":
       writeBlock(
-        conditional(getProperty("type") != "A", gAbsIncModal.format(90)), conditional(getProperty("type") != "A", gRetractModal.format(98)), gCycleModal.format(81),
+        conditional(getProperty("type") != "A", gAbsIncModal.format(90)), conditional(getProperty("type") != "A", gRetractModal.format(98)), gCycleModal.format(83),
         getCommonCycle(x, y, z, cycle.retract),
         feedOutput.format(F)
       );
@@ -1561,9 +1566,12 @@ function onCyclePoint(x, y, z) {
           "P" + milliFormat.format(P),
           feedOutput.format(F)
         );
+
+      //changed "drilling" G81 to G83 temp. 10/20/2021 ADC
+
       } else {
         writeBlock(
-          conditional(getProperty("type") != "A", gAbsIncModal.format(90)), conditional(getProperty("type") != "A", gRetractModal.format(98)), gCycleModal.format(81),
+          conditional(getProperty("type") != "A", gAbsIncModal.format(90)), conditional(getProperty("type") != "A", gRetractModal.format(98)), gCycleModal.format(83),
           getCommonCycle(x, y, z, cycle.retract),
           feedOutput.format(F)
         );
@@ -2120,6 +2128,7 @@ function onClose() {
 
   onCommand(COMMAND_COOLANT_OFF);
 
+  if (getProperty("gotChipConveyor")) {
   onCommand(COMMAND_STOP_CHIP_TRANSPORT);
   }
 
