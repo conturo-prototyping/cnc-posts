@@ -21,8 +21,6 @@
   5 - 3/25/2022
   Billy @ CP
     - added "mill" to discription
-  6 - 4/18/2022
-    -test pull
     */
 
 description = "CP - Matsuura - Mill - Fanuc 30i";
