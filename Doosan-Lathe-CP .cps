@@ -4,9 +4,8 @@
 
   Doosan Lathe post processor configuration.
 
-  $Revision: 8 - 43725 
-
- */ 
+  $Revision: 8 $ 
+*/ 
 
 
 /*
@@ -33,7 +32,7 @@ V1.6 added Adc 4-13-2022
     -G28 still works on tailstock home and pass thru as well
 
 V1.7 Added Adc 4-14-2022
-    -updated post merged with older post changes
+    -updated post to 43725 and merged with older post changes
 
 V1.8 added Adc 4-14-2022
   -changed default max spindle from 6k to 3k
