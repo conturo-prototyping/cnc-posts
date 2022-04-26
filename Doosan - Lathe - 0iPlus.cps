@@ -4,7 +4,7 @@
 
   Doosan Lathe post processor configuration.
 
-  $Revision: 8 $ 
+  $Revision: 9 $ 
 */ 
 
 
@@ -37,6 +37,10 @@ V1.7 Added Adc 4-14-2022
 V1.8 added Adc 4-14-2022
   -changed default max spindle from 6k to 3k
   -changed write tool and machine to true
+
+V1.9 Added Adc 4-28-2022
+  -changed auto on command for chip transport M24 on startup. should only work if "got chip conveyer" is true
+  
   
 */
 
@@ -714,7 +718,7 @@ function onOpen() {
 
   writeBlock(gFormat.format(getProperty("type") == "A" ? 50 : 92), sOutput.format(getProperty("maximumSpindleSpeed")));
 
-  onCommand(COMMAND_START_CHIP_TRANSPORT);
+ // onCommand(COMMAND_START_CHIP_TRANSPORT);
 }
 
 function onComment(message) {
