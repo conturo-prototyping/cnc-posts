@@ -714,7 +714,7 @@ function onOpen() {
 
   writeBlock(gFormat.format(getProperty("type") == "A" ? 50 : 92), sOutput.format(getProperty("maximumSpindleSpeed")));
 
-  onCommand(COMMAND_START_CHIP_TRANSPORT);
+ // onCommand(COMMAND_START_CHIP_TRANSPORT);
 }
 
 function onComment(message) {
