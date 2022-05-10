@@ -1,25 +1,31 @@
 /**
-  Copyright (C) 2012-2022 by Autodesk, Inc.
-  All rights reserved.
+   
+  Hyundai Fanuc 18i post processor
 
-  FANUC post processor configuration.
+  $Revision: 1  $
+  $Date:  $
 
-  $Revision: 43733 514634d3e72da88fc022a99138c0e5374dbc073e $
-  $Date: 2022-04-01 18:27:40 $
+  Hyundai Fanuc 18i post processor configuration
+  1 - 5/10/2022
+  Billy @ CP 
+    -brought post in from fusion library started life as Fanuc Generic Mill post 43733
+    -rewrote all discription stuff to match our current system
+    -.nc file  extention removed
+    -changed program title to be the title of the setup (jobdescription) in fusion instead of programcomment --around line 640
+    
 
-  FORKID {04622D27-72F0-45d4-85FB-DB346FD1AE22}
 */
 
-description = "FANUC";
+description = "CP - Hyundai - Mill - Fanuc 18i";
 vendor = "Fanuc";
-vendorUrl = "http://www.fanuc.com";
-legal = "Copyright (C) 2012-2022 by Autodesk, Inc.";
+vendorUrl = "https://machine.hyundai-wia.com/usa/";
+legal = "Conturo Prototyping";
 certificationLevel = 2;
-minimumRevision = 45793;
+minimumRevision = 0;
 
-longDescription = "Generic post for Fanuc.";
+longDescription = "Hyudai 18i post built from generic Fanuc post by Conturo prototyping";
 
-extension = "nc";
+extension = "";
 programNameIsInteger = true;
 setCodePage("ascii");
 
@@ -631,8 +637,8 @@ function onOpen() {
       warning(localize("Program number is reserved by tool builder."));
     }
     oFormat = createFormat({width:(getProperty("o8") ? 8 : 4), zeropad:true, decimals:0});
-    if (programComment) {
-      writeln("O" + oFormat.format(programId) + " (" + filterText(String(programComment).toUpperCase(), permittedCommentChars) + ")");
+    if (jobdescription) {
+      writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
     } else {
       writeln("O" + oFormat.format(programId));
     }
