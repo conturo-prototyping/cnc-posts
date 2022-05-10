@@ -637,6 +637,7 @@ function onOpen() {
       warning(localize("Program number is reserved by tool builder."));
     }
     oFormat = createFormat({width:(getProperty("o8") ? 8 : 4), zeropad:true, decimals:0});
+    var jobdescription = (getGlobalParameter("job-description"))
     if (jobdescription) {
       writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
     } else {
