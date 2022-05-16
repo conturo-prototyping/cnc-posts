@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 1  $
+  $Revision: 2  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
