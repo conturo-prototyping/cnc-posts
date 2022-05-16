@@ -12,7 +12,11 @@
     -rewrote all discription stuff to match our current system
     -.nc file  extention removed
     -changed program title to be the title of the setup (jobdescription) in fusion instead of programcomment --around line 640
-    
+  2 - 5/11/2022
+  Billy @ CP
+    -setup B axis. unfortunatly work plane tilting isn't an option on this machine so we will have to work from the center of the tombstone
+    -setup chip transport but haven't assigned an M-code yet
+
 
 */
 
@@ -147,6 +151,14 @@ properties = {
     value      : false,
     scope      : "post"
   },
+  useMultiAxisFeatures: {
+    title      : "Use G68.2",
+    description: "Enable to use G68.2 for 3+2 operations.",
+    group      : "multiAxis",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
   showNotes: {
     title      : "Show notes",
     description: "Writes operation notes as comments in the outputted code.",
@@ -213,7 +225,7 @@ properties = {
       {title:"Cycles", id:"cycles"},
       {title:"Patterns", id:"patterns"}
     ],
-    value: "none",
+    value: "cycles",
     scope: "post"
   },
   useFilesForSubprograms: {
@@ -262,6 +274,14 @@ properties = {
     title      : "Create single results file",
     description: "Set to false if you want to store the measurement results for each probe / inspection toolpath in a separate file",
     group      : "probing",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  chipTransport: {
+    title      : "Use chip transport",
+    description: "Enable to turn on chip transport at start of program.",
+    group      : "preferences",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -353,12 +373,12 @@ var gRotationModal = createModal({
 
 // fixed settings
 var firstFeedParameter = 500;
-var useMultiAxisFeatures = true;
+var useMultiAxisFeatures;
 var forceMultiAxisIndexing = false; // force multi-axis indexing for 3D programs
 var maximumLineLength = 80; // the maximum number of charaters allowed in a line
 var minimumCyclePoints = 5; // minimum number of points in cycle operation to consider for subprogram
 var cancelTiltFirst = true; // cancel G68.2 with G69 prior to G54-G59 WCS block
-var useABCPrepositioning = false; // position ABC axes prior to G68.2 block
+var useABCPrepositioning = true; // position ABC axes prior to G68.2 block
 
 var WARNING_WORK_OFFSET = 0;
 
@@ -534,10 +554,11 @@ function getBodyLength(tool) {
 
 function defineMachine() {
   var useTCP = true;
-  if (false) { // note: setup your machine here
-    var aAxis = createAxis({coordinate:0, table:true, axis:[1, 0, 0], range:[-120, 120], preference:1, tcp:useTCP});
-    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360, 360], preference:0, tcp:useTCP});
-    machineConfiguration = new MachineConfiguration(aAxis, cAxis);
+  if (true) { // note: setup your machine here
+    //var aAxis = createAxis({coordinate:0, table:true, axis:[1, 0, 0], range:[-120, 120], preference:1, tcp:useTCP});
+    var bAxis = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-360, 360], preference:0, tcp:useTCP});
+    //var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360, 360], preference:0, tcp:useTCP});
+    machineConfiguration = new MachineConfiguration(/**aAxis,*/ bAxis/** , cAxis*/);
 
     setMachineConfiguration(machineConfiguration);
     if (receivedMachineConfiguration) {
@@ -667,6 +688,19 @@ function onOpen() {
     }
   }
 
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date
+	if (hasGlobalParameter("generated-at")) {
+    var datetime = getGlobalParameter("generated-at");
+		  writeComment("Program Posted: " + datetime + "UTC0");
+		  }
+
   //Probing Surface Inspection
   if (typeof inspectionWriteVariables == "function") {
     inspectionWriteVariables();
@@ -756,6 +790,10 @@ function onOpen() {
     break;
   }
 
+  if (getProperty("chipTransport")) {
+    onCommand(COMMAND_START_CHIP_TRANSPORT);
+  }
+
   if (getProperty("useG95") && getProperty("useParametricFeed")) {
     error(localize("Parametric feed is not supported when using G95."));
     return;
@@ -766,6 +804,8 @@ function onOpen() {
     feedOutput = createVariable({prefix:"F"}, feedFormat);
   }
 }
+
+
 
 function onComment(message) {
   var comments = String(message).split(";");
@@ -1221,7 +1261,7 @@ function setWorkPlane(abc) {
     if (abc.isNonZero()) {
       skipBlock = _skipBlock;
       gRotationModal.reset();
-      writeBlock(gRotationModal.format(68.2), "X" + xyzFormat.format(0), "Y" + xyzFormat.format(0), "Z" + xyzFormat.format(0), "I" + abcFormat.format(abc.x), "J" + abcFormat.format(abc.y), "K" + abcFormat.format(abc.z)); // set frame
+      writeBlock(gRotationModal.format(68.2), "X" + xyzFormat.format(0), "Y" + xyzFormat.format(0), "Z" + xyzFormat.format(0), /*"I" + abcFormat.format(abc.x),*/ "J" + abcFormat.format(abc.y)/*, "K" + abcFormat.format(abc.z)*/); // set frame
       skipBlock = _skipBlock;
       writeBlock(gFormat.format(53.1)); // turn machine
     } else {
@@ -1658,6 +1698,7 @@ function onSection() {
     if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
+    
 
     if (tool.number > 99) {
       warning(localize("Tool number exceeds maximum value."));
@@ -3003,8 +3044,10 @@ function onCommand(command) {
   case COMMAND_UNLOCK_MULTI_AXIS:
     return;
   case COMMAND_START_CHIP_TRANSPORT:
+      writeBlock(mFormat.format(33));
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
+      writeBlock(mFormat.format(34));
     return;
   case COMMAND_BREAK_CONTROL:
     return;
