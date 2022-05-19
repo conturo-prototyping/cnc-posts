@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 2  $
+  $Revision: 3  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -16,6 +16,9 @@
   Billy @ CP
     -setup B axis. unfortunatly work plane tilting isn't an option on this machine so we will have to work from the center of the tombstone
     -setup chip transport but haven't assigned an M-code yet
+  3 - 5/29/2022
+  Billy @ CP
+    -setup chip transport for on/off from properties
 
 
 */
@@ -3044,10 +3047,14 @@ function onCommand(command) {
   case COMMAND_UNLOCK_MULTI_AXIS:
     return;
   case COMMAND_START_CHIP_TRANSPORT:
+    if (chipTransport) {
       writeBlock(mFormat.format(33));
+    }
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
+    if (chipTransport) {
       writeBlock(mFormat.format(34));
+    }
     return;
   case COMMAND_BREAK_CONTROL:
     return;
