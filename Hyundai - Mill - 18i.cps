@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 3  $
+  $Revision: 4  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -12,13 +12,19 @@
     -rewrote all discription stuff to match our current system
     -.nc file  extention removed
     -changed program title to be the title of the setup (jobdescription) in fusion instead of programcomment --around line 640
-  2 - 5/11/2022
+  
+    2 - 5/11/2022
   Billy @ CP
     -setup B axis. unfortunatly work plane tilting isn't an option on this machine so we will have to work from the center of the tombstone
     -setup chip transport but haven't assigned an M-code yet
-  3 - 5/29/2022
+  
+    3 - 5/29/2022
   Billy @ CP
     -setup chip transport for on/off from properties
+  
+    4 - 5/20/2022
+  Billy @ CP
+     -nixed chip transport until we can figure it out
 
 
 */
@@ -3047,14 +3053,10 @@ function onCommand(command) {
   case COMMAND_UNLOCK_MULTI_AXIS:
     return;
   case COMMAND_START_CHIP_TRANSPORT:
-    if (chipTransport) {
-      writeBlock(mFormat.format(33));
-    }
+      //writeBlock(mFormat.format(33));
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
-    if (chipTransport) {
-      writeBlock(mFormat.format(34));
-    }
+      //writeBlock(mFormat.format(34));
     return;
   case COMMAND_BREAK_CONTROL:
     return;
