@@ -1,7 +1,7 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 7 $
+  $Revision: 8 $
   $Date: 2022-03-31 $
   
 
@@ -36,6 +36,10 @@
     7 03/31/2022
     Billy @ CP
       -reverted back to Fusion post version 43573 from version 43690 because of inspection not working
+
+    8 5/26/2022
+    Billy @ CP
+      -updated spindle RPM limits on UMCs
 
 
 */
@@ -801,7 +805,7 @@ function defineMachineModel() {
     machineConfiguration.setHomePositionX(toPreciseUnit(-23.96, IN));
     machineConfiguration.setHomePositionY(toPreciseUnit(-3.37, IN));
     machineConfiguration.setRetractPlane(toPreciseUnit(0, IN));
-    maximumSpindleRPM = 8100;
+    maximumSpindleRPM = 15000;
     break;
   case "umc-750":
     var axis1 = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-35, 120], preference:1, tcp:useTCP});
@@ -810,7 +814,7 @@ function defineMachineModel() {
     machineConfiguration.setHomePositionX(toPreciseUnit(-29.0, IN));
     machineConfiguration.setHomePositionY(toPreciseUnit(-8, IN));
     machineConfiguration.setRetractPlane(toPreciseUnit(2.5, IN));
-    maximumSpindleRPM = 8100;
+    maximumSpindleRPM = 12000;
     break;
   case "umc-1000":
     var axis1 = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-35, 120], preference:1, tcp:useTCP});
@@ -819,7 +823,7 @@ function defineMachineModel() {
     machineConfiguration.setHomePositionX(toPreciseUnit(-40.07, IN));
     machineConfiguration.setHomePositionY(toPreciseUnit(-10.76, IN));
     machineConfiguration.setRetractPlane(toPreciseUnit(0, IN));
-    maximumSpindleRPM = 8100;
+    maximumSpindleRPM = 15000;
     break;
   case "umc-1600":
     var axis1 = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-120, 120], preference:1, tcp:useTCP});
