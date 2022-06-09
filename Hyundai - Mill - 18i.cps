@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 5  $
+  $Revision: 6  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -24,6 +24,8 @@
 
   5  - 5/20/2022 Billy@ CP
     -commented out X retract 5/20/22
+  6 - 6/9/2022 Billy
+    -added coolant flush and jet logic
 
 
 */
@@ -319,7 +321,9 @@ var coolants = [
   {id:COOLANT_SUCTION},
   {id:COOLANT_FLOOD_MIST},
   {id:COOLANT_FLOOD_THROUGH_TOOL, on:[8, 88], off:[9, 89]},
-  {id:COOLANT_OFF, off:9}
+  {id:COOLANT_OFF, off:9},
+  {id:COOLANT_FLUSH, on:51},
+  {id:COOLANT_JET, on:47}
 ];
 
 var permittedCommentChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,=_-";
@@ -3033,6 +3037,7 @@ function onCommand(command) {
     return;
   case COMMAND_COOLANT_ON:
     setCoolant(COOLANT_FLOOD);
+    setCoolant(COOLANT_FLUSH);
     return;
   case COMMAND_STOP:
     writeBlock(mFormat.format(0));
@@ -3046,6 +3051,7 @@ function onCommand(command) {
     return;
   case COMMAND_START_SPINDLE:
     onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
+    setCoolant(COOLANT_JET);
     return;
   case COMMAND_LOCK_MULTI_AXIS:
     return;
