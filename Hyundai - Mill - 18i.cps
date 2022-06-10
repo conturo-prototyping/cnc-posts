@@ -2,34 +2,38 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 7  $
+  $Revision: 8  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
   1 - 5/10/2022 Billy @ CP 
-    -brought post in from fusion library started life as Fanuc Generic Mill post 43733
-    -rewrote all discription stuff to match our current system
-    -.nc file  extention removed
-    -changed program title to be the title of the setup (jobdescription) in fusion instead of programcomment --around line 640
+     -brought post in from fusion library started life as Fanuc Generic Mill post 43733
+     -rewrote all discription stuff to match our current system
+     -.nc file  extention removed
+     -changed program title to be the title of the setup (jobdescription) in fusion instead of programcomment --around line 640
   
   2 - 5/11/2022 Billy @ CP
-    -setup B axis. unfortunatly work plane tilting isn't an option on this machine so we will have to work from the center of the tombstone
-    -setup chip transport but haven't assigned an M-code yet
+     -setup B axis. unfortunatly work plane tilting isn't an option on this machine so we will have to work from the center of the tombstone
+     -setup chip transport but haven't assigned an M-code yet
   
   3 - 5/19/2022 Billy @ CP
-    -setup chip transport for on/off from properties
+      -setup chip transport for on/off from properties
   
   4 - 5/20/2022 Billy @ CP
-     -nixed chip transport until we can figure it out
+      -nixed chip transport until we can figure it out
 
   5  - 5/20/2022 Billy@ CP
-    -commented out X retract 5/20/22
+      -commented out X retract 5/20/22
 
   6 - 6/9/2022 Billy
-    -added coolant flush and jet logic
+      -added coolant flush and jet logic
   
   7 - 6/9/2022 Billy
-    -removed coolant flush to try to get jet working only
+      -removed coolant flush to try to get jet working only
+
+  8 - 6/10/2022 Billy
+      - set max spindle speed to 15k
+      - coolant flush with spindle cutting
 
 
 
@@ -300,7 +304,16 @@ properties = {
     type       : "boolean",
     value      : true,
     scope      : "post"
+  },
+  coolantFlush: {
+    title      : "Use flush coolant",
+    description: "Enable to turn on flush coolant with spindle during cutting.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
   }
+
 };
 
 // wcs definiton
@@ -1766,11 +1779,11 @@ function onSection() {
     (tool.clockwise != getPreviousSection().getTool().clockwise);
     if (outputSpindleSpeed || operationNeedsSafeStart) {
       forceSpindleSpeed = false;
-      if (spindleSpeed < 1) {
+      if (spindleSpeed < 1) { //set minimum spindle speed
         error(localize("Spindle speed out of range."));
         return;
       }
-      if (spindleSpeed > 99999) {
+      if (spindleSpeed > 15000) { //set max spindle speed
         warning(localize("Spindle speed exceeds maximum value."));
       }
       var tapping = hasParameter("operation:cycleType") &&
@@ -1781,7 +1794,8 @@ function onSection() {
       if (!tapping || (tapping && !(getProperty("useRigidTapping") == "without"))) {
         skipBlock = !outputSpindleSpeed;
         writeBlock(
-          sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4)
+          sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4),
+          mFormat.format(51) //coolant flush on with spindle
         );
       }
       onCommand(COMMAND_START_CHIP_TRANSPORT);
