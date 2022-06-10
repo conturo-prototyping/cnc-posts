@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 8  $
+  $Revision: 9  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -34,6 +34,9 @@
   8 - 6/10/2022 Billy
       - set max spindle speed to 15k
       - coolant flush with spindle cutting
+  
+  9 - 6/10/2022 Billy
+      - moved coolant flush to another line and made it a property that can be unchecked
 
 
 
@@ -1794,8 +1797,7 @@ function onSection() {
       if (!tapping || (tapping && !(getProperty("useRigidTapping") == "without"))) {
         skipBlock = !outputSpindleSpeed;
         writeBlock(
-          sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4),
-          mFormat.format(51) //coolant flush on with spindle
+          sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4)
         );
       }
       onCommand(COMMAND_START_CHIP_TRANSPORT);
@@ -1805,6 +1807,17 @@ function onSection() {
     }
   }
 
+  //coolant flush
+  if (tool.type != TOOL_PROBE) {
+      var flush = getProperty("coolantFlush")  //refer to property to use or not
+      if(flush){
+        writeBlock(    
+          mFormat.format(51) //M51 on hyundai for coolant flush
+        );
+      }
+      }
+  
+  
   // wcs
   if (insertToolCall || operationNeedsSafeStart) { // force work offset when changing tool
     currentWorkOffset = undefined;
@@ -3065,8 +3078,7 @@ function onCommand(command) {
     forceSpindleSpeed = true;
     forceCoolant = true;
     return;
-  case COMMAND_START_SPINDLE:
-    //writeBlock(mFormat.format(51)); //spindle flush  
+  case COMMAND_START_SPINDLE: 
     onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
     return;
   case COMMAND_LOCK_MULTI_AXIS:
