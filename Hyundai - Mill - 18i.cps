@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 6  $
+  $Revision: 7  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -24,8 +24,13 @@
 
   5  - 5/20/2022 Billy@ CP
     -commented out X retract 5/20/22
+
   6 - 6/9/2022 Billy
     -added coolant flush and jet logic
+  
+  7 - 6/9/2022 Billy
+    -removed coolant flush to try to get jet working only
+
 
 
 */
@@ -313,7 +318,7 @@ var singleLineCoolant = false; // specifies to output multiple coolant codes in 
 // {id: COOLANT_THROUGH_TOOL, on: [8, 88], off: [9, 89]}
 // {id: COOLANT_THROUGH_TOOL, on: "M88 P3 (myComment)", off: "M89"}
 var coolants = [
-  {id:COOLANT_FLOOD, on:8},
+  {id:COOLANT_FLOOD, on: [8, 47]},
   {id:COOLANT_MIST},
   {id:COOLANT_THROUGH_TOOL, on:88, off:89},
   {id:COOLANT_AIR},
@@ -321,9 +326,7 @@ var coolants = [
   {id:COOLANT_SUCTION},
   {id:COOLANT_FLOOD_MIST},
   {id:COOLANT_FLOOD_THROUGH_TOOL, on:[8, 88], off:[9, 89]},
-  {id:COOLANT_OFF, off:9},
-  {id:COOLANT_FLUSH, on:51},
-  {id:COOLANT_JET, on:47}
+  {id:COOLANT_OFF, off:9}
 ];
 
 var permittedCommentChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,=_-";
@@ -3024,7 +3027,7 @@ function getCoolantCodes(coolant) {
 
 var mapCommand = {
   COMMAND_END                     : 2,
-  COMMAND_SPINDLE_CLOCKWISE       : 3,
+  COMMAND_SPINDLE_CLOCKWISE       : 3, 
   COMMAND_SPINDLE_COUNTERCLOCKWISE: 4,
   COMMAND_STOP_SPINDLE            : 5,
   COMMAND_ORIENTATE_SPINDLE       : 19
@@ -3037,7 +3040,6 @@ function onCommand(command) {
     return;
   case COMMAND_COOLANT_ON:
     setCoolant(COOLANT_FLOOD);
-    setCoolant(COOLANT_FLUSH);
     return;
   case COMMAND_STOP:
     writeBlock(mFormat.format(0));
@@ -3050,8 +3052,8 @@ function onCommand(command) {
     forceCoolant = true;
     return;
   case COMMAND_START_SPINDLE:
+    //writeBlock(mFormat.format(51)); //spindle flush  
     onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
-    setCoolant(COOLANT_JET);
     return;
   case COMMAND_LOCK_MULTI_AXIS:
     return;
