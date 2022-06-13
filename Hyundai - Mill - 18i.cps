@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 9  $
+  $Revision: 10  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -37,6 +37,10 @@
   
   9 - 6/10/2022 Billy
       - moved coolant flush to another line and made it a property that can be unchecked
+
+  10 - 6/13/2022 Billy
+      - started work on high speed machining and smoothing logic
+
 
 
 
@@ -198,18 +202,18 @@ properties = {
       {title:"Off", id:"-1"},
       {title:"On", id:"0"},
       {title:"Automatic", id:"9999"},
-      {title:"Level 1", id:"1"},
-      {title:"Level 2", id:"2"},
-      {title:"Level 3", id:"3"},
-      {title:"Level 4", id:"4"},
-      {title:"Level 5", id:"5"},
-      {title:"Level 6", id:"6"},
-      {title:"Level 7", id:"7"},
-      {title:"Level 8", id:"8"},
-      {title:"Level 9", id:"9"},
-      {title:"Level 10", id:"10"},
+      //{title:"Level 1", id:"1"},
+      //{title:"Level 2", id:"2"},
+      //{title:"Level 3", id:"3"},
+      //{title:"Level 4", id:"4"},
+      //{title:"Level 5", id:"5"},
+      //{title:"Level 6", id:"6"},
+      //{title:"Level 7", id:"7"},
+      //{title:"Level 8", id:"8"},
+      //{title:"Level 9", id:"9"},
+      //{title:"Level 10", id:"10"},
     ],
-    value: "-1",
+    value: "9999",
     scope: "post"
   },
   usePitchForTapping: {
@@ -894,7 +898,7 @@ var smoothingSettings = {
   thresholdSemiFinishing: toPreciseUnit(0.1, MM), // operations with stock/tolerance above finishing and below threshold roughing that threshold will use semi finishing level in automatic mode
 
   differenceCriteria: "level", // options: "level", "tolerance", "both". Specifies criteria when output smoothing codes
-  autoLevelCriteria : "stock", // use "stock" or "tolerance" to determine levels in automatic mode
+  autoLevelCriteria : "tolerance", // use "stock" or "tolerance" to determine levels in automatic mode // switched ot tolerance mode by Billy 6/13/2022
   cancelCompensation: true // tool length compensation must be canceled prior to changing the smoothing level
 };
 
