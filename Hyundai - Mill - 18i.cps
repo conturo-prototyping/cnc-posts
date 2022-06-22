@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 10  $
+  $Revision: 11  $
   $Date:  $
 
   Hyundai Fanuc 18i post processor configuration
@@ -39,7 +39,21 @@
       - moved coolant flush to another line and made it a property that can be unchecked
 
   10 - 6/13/2022 Billy
-      - started work on high speed machining and smoothing logic
+      - started work on high speed machining and smoothing logic to drive R value
+  
+  11 - 6/22/2022 Billy
+      - removed option for 8 digit program number
+      - added program 5001 to list of programs reserved by tool builder
+      - moved jet and flush to it's own logic (this isn't great yet. It calls every section, only needed if it's off)
+      - allow 200 tool numbers
+      - added an option to zero rotory axis at the beginning
+      - added passthrough (the passthrough postion in the code isn't perfect)
+      - moved the section comment to the top of the section even though this could be confusing with tool changes
+      - removed automatic AICC for now, just Q1 and Q0 to turn on and off
+            >> future issues to solve <<
+              *z retract every time AICC R value is changed
+              *jet and flush logic should probably be moved to a function that happens seporately
+  
 
 
 
@@ -129,14 +143,6 @@ properties = {
     value      : true,
     scope      : "post"
   },
-  o8: {
-    title      : "8 Digit program number",
-    description: "Specifies that an 8 digit program number is needed.",
-    group      : "preferences",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  },
   separateWordsWithSpace: {
     title      : "Separate words with space",
     description: "Adds spaces between words if 'yes' is selected.",
@@ -201,7 +207,7 @@ properties = {
     values     : [
       {title:"Off", id:"-1"},
       {title:"On", id:"0"},
-      {title:"Automatic", id:"9999"},
+      //{title:"Automatic", id:"9999"},
       //{title:"Level 1", id:"1"},
       //{title:"Level 2", id:"2"},
       //{title:"Level 3", id:"3"},
@@ -213,7 +219,7 @@ properties = {
       //{title:"Level 9", id:"9"},
       //{title:"Level 10", id:"10"},
     ],
-    value: "9999",
+    value: "0",
     scope: "post"
   },
   usePitchForTapping: {
@@ -283,6 +289,14 @@ properties = {
     value: "G28",
     scope: "post"
   },
+  homeABC: {
+    title      : "Home rotary axis at the beginning",
+    description: "Set to true to zero rotoray axis at program start",
+    group      : "homePositions",
+    type       : "boolean",
+    value: false,
+    scope: "post"
+  },
   useRigidTapping: {
     title      : "Use rigid tapping",
     description: "Select 'Yes' to enable, 'No' to disable, or 'Without spindle direction' to enable rigid tapping without outputting the spindle direction block.",
@@ -308,8 +322,13 @@ properties = {
     title      : "Use chip transport",
     description: "Enable to turn on chip transport at start of program.",
     group      : "preferences",
-    type       : "boolean",
-    value      : true,
+    type       : "enum",
+    values     : [
+      {title:"Always On", id:"on"},
+      {title:"Automatic", id:"auto"},
+      {title:"Passthru Only", id:"pass"}
+    ],
+    value: "auto",
     scope      : "post"
   },
   coolantFlush: {
@@ -338,7 +357,7 @@ var singleLineCoolant = false; // specifies to output multiple coolant codes in 
 // {id: COOLANT_THROUGH_TOOL, on: [8, 88], off: [9, 89]}
 // {id: COOLANT_THROUGH_TOOL, on: "M88 P3 (myComment)", off: "M89"}
 var coolants = [
-  {id:COOLANT_FLOOD, on: [8, 47]},
+  {id:COOLANT_FLOOD, on: [8]},
   {id:COOLANT_MIST},
   {id:COOLANT_THROUGH_TOOL, on:88, off:89},
   {id:COOLANT_AIR},
@@ -678,21 +697,14 @@ function onOpen() {
       error(localize("Program name must be a number."));
       return;
     }
-    if (getProperty("o8")) {
-      if (!((programId >= 1) && (programId <= 99999999))) {
-        error(localize("Program number is out of range."));
-        return;
-      }
-    } else {
-      if (!((programId >= 1) && (programId <= 9999))) {
-        error(localize("Program number is out of range."));
-        return;
-      }
-    }
-    if ((programId >= 8000) && (programId <= 9999)) {
+    if (!((programId >= 1) && (programId <= 9999))) {
+      error(localize("Program number is out of range."));
+      return;
+    }    
+    if ((programId >= 8000) && (programId <= 9999) && (programId == 5001)) {
       warning(localize("Program number is reserved by tool builder."));
     }
-    oFormat = createFormat({width:(getProperty("o8") ? 8 : 4), zeropad:true, decimals:0});
+    oFormat = createFormat({width:(4), zeropad:true, decimals:0});
     var jobdescription = (getGlobalParameter("job-description"))
     if (jobdescription) {
       writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
@@ -825,7 +837,7 @@ function onOpen() {
     break;
   }
 
-  if (getProperty("chipTransport")) {
+  if (getProperty("chipTransport") == "on") {
     onCommand(COMMAND_START_CHIP_TRANSPORT);
   }
 
@@ -1387,6 +1399,7 @@ function printProbeResults() {
 
 var probeOutputWorkOffset = 1;
 
+
 function onParameter(name, value) {
   if (name == "probe-output-work-offset") {
     probeOutputWorkOffset = (value > 0) ? value : 1;
@@ -1646,6 +1659,21 @@ function setAbsoluteMode(xyz, abc) {
 }
 
 function onSection() {
+  // write operation comment
+  if (hasParameter("operation-comment")) {
+    var comment = getParameter("operation-comment");
+    if (comment && ((comment !== lastOperationComment) || !patternIsActive || insertToolCall)) {
+      writeln("");
+      writeComment(comment);
+      lastOperationComment = comment;
+    } else if (!patternIsActive || insertToolCall) {
+      writeln("");
+    }
+  } else {
+    writeln("");
+  }  
+  
+  //retract
   var forceToolAndRetract = optionalSection && !currentSection.isOptional();
   optionalSection = currentSection.isOptional();
 
@@ -1677,9 +1705,11 @@ function onSection() {
     }
 
     // retract to safe plane
-    writeRetract(Z); // retract
+    //if(!smoothing.cancel){
+      writeRetract(Z); // retract
+    //}
 
-    if (isFirstSection() && machineConfiguration.isMultiAxisConfiguration()) {
+    if (isFirstSection() && machineConfiguration.isMultiAxisConfiguration() && getProperty("homeABC")) {
       setWorkPlane(new Vector(0, 0, 0)); // reset working plane
     }
     forceXYZ();
@@ -1689,19 +1719,7 @@ function onSection() {
     }
   }
 
-  if (hasParameter("operation-comment")) {
-    var comment = getParameter("operation-comment");
-    if (comment && ((comment !== lastOperationComment) || !patternIsActive || insertToolCall)) {
-      writeln("");
-      writeComment(comment);
-      lastOperationComment = comment;
-    } else if (!patternIsActive || insertToolCall) {
-      writeln("");
-    }
-  } else {
-    writeln("");
-  }
-
+  
   if (getProperty("showNotes") && hasParameter("notes")) {
     var notes = getParameter("notes");
     if (notes) {
@@ -1730,18 +1748,19 @@ function onSection() {
       forceWorkPlane();
       onCommand(COMMAND_COOLANT_OFF);
     }
+
     if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
     
-
-    if (tool.number > 99) {
+    if (tool.number > 200) {
       warning(localize("Tool number exceeds maximum value."));
     }
 
     if (insertToolCall) {
       disableLengthCompensation(false);
     }
+    
     skipBlock = !insertToolCall;
     writeBlock("T" + toolFormat.format(tool.number), mFormat.format(6));
     if (tool.comment) {
@@ -1804,23 +1823,12 @@ function onSection() {
           sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4)
         );
       }
-      onCommand(COMMAND_START_CHIP_TRANSPORT);
       if (forceMultiAxisIndexing || !is3D() || machineConfiguration.isMultiAxisConfiguration()) {
       // writeBlock(mFormat.format(xxx)); // shortest path traverse
       }
     }
   }
 
-  //coolant flush
-  if (tool.type != TOOL_PROBE) {
-      var flush = getProperty("coolantFlush")  //refer to property to use or not
-      if(flush){
-        writeBlock(    
-          mFormat.format(51) //M51 on hyundai for coolant flush
-        );
-      }
-      }
-  
   
   // wcs
   if (insertToolCall || operationNeedsSafeStart) { // force work offset when changing tool
@@ -1848,6 +1856,29 @@ function onSection() {
   // set coolant after we have positioned at Z
   setCoolant(tool.coolant);
 
+  //start coolant flush and jet
+  if (tool.type != TOOL_PROBE) {
+    var flush = getProperty("coolantFlush")  //refer to property to use or not
+    if(flush){
+      writeBlock(mFormat.format(51) //M51 on hyundai for coolant flush in APC door and main door
+      );
+      if(tool.diameter >= .34 && tool.coolant){
+        writeBlock(mFormat.format(47) //M47 on hyundai for coolant jets overhead
+        );
+      }
+    }
+  }
+
+
+  //chip transport external chip conveyor automatic operation
+  if (tool.type != TOOL_PROBE) {
+      if(getProperty("chipTransport") == "auto"){      
+        if(tool.diameter >= .34){
+         onCommand(COMMAND_START_CHIP_TRANSPORT) //hyundai external chip conveyor
+        }
+      }
+  }
+  
   setSmoothing(smoothing.isAllowed);
 
   forceAny();
@@ -1954,6 +1985,16 @@ function onSection() {
   subprogramDefine(initialPosition, abc, retracted, zIsOutput);
 
   retracted = false;
+}
+
+
+function onPassThrough(text) {
+		var commands = String(text).split(",");
+		writeln("");
+		writeln("(Pass Through)");
+	for (text in commands) {
+		writeBlock(commands[text]);
+	}
 }
 
 function onDwell(seconds) {
@@ -2954,7 +2995,7 @@ function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
         writeBlock(gMotionModal.format(clockwise ? 2.4 : 3.4), xOutput.format(ip.x), yOutput.format(ip.y), zOutput.format(ip.z), getFeed(feed));
         writeBlock(xOutput.format(x), yOutput.format(y), zOutput.format(z));
       } else {
-        linearize(tolerance);
+        linearize(tolerance);COOLANT_OFF
       }
     }
   }
@@ -3090,10 +3131,10 @@ function onCommand(command) {
   case COMMAND_UNLOCK_MULTI_AXIS:
     return;
   case COMMAND_START_CHIP_TRANSPORT:
-      //writeBlock(mFormat.format(33));
+    writeBlock(mFormat.format(33));
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
-      //writeBlock(mFormat.format(34));
+    writeBlock(mFormat.format(34));
     return;
   case COMMAND_BREAK_CONTROL:
     return;
@@ -3130,6 +3171,12 @@ function onSectionEnd() {
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
   }
+
+  if (!isLastSection() && (getNextSection().getTool().type == TOOL_PROBE) && (getNextSection().getTool().diameter < .34)) {
+    onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+  }
+
+
 
   if (true) {
     if (isRedirecting()) {
