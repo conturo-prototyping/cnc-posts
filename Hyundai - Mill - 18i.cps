@@ -2,10 +2,10 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 11  $
+  $Revision: 12  $
   $Date:  $
 
-  Hyundai Fanuc 18i post processor configuration
+  Hyundai Fanuc 18i-MB post processor configuration
   1 - 5/10/2022 Billy @ CP 
      -brought post in from fusion library started life as Fanuc Generic Mill post 43733
      -rewrote all discription stuff to match our current system
@@ -51,8 +51,11 @@
       - moved the section comment to the top of the section even though this could be confusing with tool changes
       - removed automatic AICC for now, just Q1 and Q0 to turn on and off
             >> future issues to solve <<
-              *z retract every time AICC R value is changed
+              *z retract every time AICC R value is changed. might be unavoidable
               *jet and flush logic should probably be moved to a function that happens seporately
+  
+  12 - 7/5/2022 Billy
+     -set maximum sequence number to 99999 and then restarts count
   
 
 
@@ -458,6 +461,7 @@ var subprograms = [];
 var currentPattern = -1;
 var firstPattern = false;
 var currentSubprogram;
+var initialSubprogramNumber = 90000;
 var lastSubprogram;
 var definedPatterns = new Array();
 var incrementalMode = false;
@@ -481,7 +485,12 @@ function writeBlock() {
   if (!text) {
     return;
   }
+  var maximumSequenceNumber = ((getProperty("useSubroutines") == "allOperations") || (getProperty("useSubroutines") == "patterns") ||
+    (getProperty("useSubroutines") == "cycles")) ? initialSubprogramNumber : 99999;
   if (getProperty("showSequenceNumbers")) {
+    if (sequenceNumber >= maximumSequenceNumber) {
+      sequenceNumber = getProperty("sequenceNumberStart");
+    }
     if (optionalSection || skipBlock) {
       if (text) {
         writeWords("/", "N" + sequenceNumber, text);
