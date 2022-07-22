@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 12  $
+  $Revision: 13  $
   $Date:  $
 
   Hyundai Fanuc 18i-MB post processor configuration
@@ -55,8 +55,10 @@
               *jet and flush logic should probably be moved to a function that happens seporately
   
   12 - 7/5/2022 Billy
-     -set maximum sequence number to 99999 and then restarts count
+      -set maximum sequence number to 99999 and then restarts count
   
+  13 - 7/22/2022 Billy
+      -added chip transport logic for off/on/auto
 
 
 
@@ -1757,7 +1759,12 @@ function onSection() {
       forceWorkPlane();
       onCommand(COMMAND_COOLANT_OFF);
     }
-
+    if (getProperty("chipTransport") == "auto") {
+      if (!isFirstSection() && insertToolCall) {
+        onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+      }
+    }
+    
     if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
@@ -3179,10 +3186,9 @@ function onSectionEnd() {
   }
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
-  }
-
-  if (!isLastSection() && (getNextSection().getTool().type == TOOL_PROBE) && (getNextSection().getTool().diameter < .34)) {
-    onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+    if (getProperty("chipTransport") == "automatic"){
+      onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+    }
   }
 
 
@@ -3469,6 +3475,8 @@ function onClose() {
   optionalSection = false;
 
   onCommand(COMMAND_COOLANT_OFF);
+
+  onCommand(COMMAND_STOP_CHIP_TRANSPORT);
 
   writeRetract(Z); // retract
 
