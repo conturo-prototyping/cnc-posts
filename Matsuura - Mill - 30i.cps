@@ -4,7 +4,7 @@
   
   Matsuura Fanuc 30i post processor
 
-  $Revision: 5  $
+  $Revision: 6  $
   $Date:  $
 
   Matsuura Fanuc 30i post processor configuration
@@ -21,6 +21,16 @@
   5 - 3/25/2022
   Billy @ CP
     - added "mill" to discription
+  
+  6 - 8/1/2022
+  Billy @ CP
+    - added chip management logic, flush and chip conveyor on the same M code. refered to as "chiptransport" or "Chip Management" for all operatoins
+    - username added to top of program
+    - date added to top of program
+    - job description is now what feeds the program name, same as our other posts
+    - dump post properties at the top of the program
+    - added groups and formating to post properties
+  
     */
 
 description = "CP - Matsuura - Mill - Fanuc 30i";
@@ -30,7 +40,7 @@ legal = "Conturo Prototyping";
 certificationLevel = 2;
 minimumRevision = 0 ;
 
-longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo prototyping and NexGenCam";
+longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo Prototyping and NexGenCam";
 
 extension = "";
 programNameIsInteger = true;
@@ -73,44 +83,183 @@ properties = {
   useFilesForSubprograms: false, // specifies that one file should be generated to section
   useSubroutinePatterns: false, // generates subroutines for patterned operation
   useSubroutineCycles: false, // generates subroutines for cycle operations on same holes
-  useRigidTapping: "yes" // output rigid tapping block
+  useRigidTapping: "yes", // output rigid tapping block
+  chipTransport: "auto" // chip transport property
 };
 
 // user-defined property definitions
 propertyDefinitions = {
-  writeMachine: {title:"Write machine", description:"Output the machine settings in the header of the code.", group:0, type:"boolean"},
-  writeTools: {title:"Write tool list", description:"Output a tool list in the header of the code.", group:0, type:"boolean"},
-  preloadTool: {title:"Preload tool", description:"Preloads the next tool at a tool change (if any).", group:1, type:"boolean"},
-  showSequenceNumbers: {title:"Use sequence numbers", description:"Use sequence numbers for each block of outputted code.", group:1, type:"boolean"},
-  sequenceNumberStart: {title:"Start sequence number", description:"The number at which to start the sequence numbers.", group:1, type:"integer"},
-  sequenceNumberIncrement: {title:"Sequence number increment", description:"The amount by which the sequence number is incremented by in each block.", group:1, type:"integer"},
-  optionalStop: {title:"Optional stop", description:"Outputs optional stop code during when necessary in the code.", type:"boolean"},
-  o8: {title:"8 Digit program number", description:"Specifies that an 8 digit program number is needed.", type:"boolean"},
-  separateWordsWithSpace: {title:"Separate words with space", description:"Adds spaces between words if 'yes' is selected.", type:"boolean"},
-  allow3DArcs: {title:"Allow 3D arcs", description:"Specifies whether 3D circular arcs are allowed.", type:"boolean"},
-  useRadius: {title:"Radius arcs", description:"If yes is selected, arcs are outputted using radius values rather than IJK.", type:"boolean"},
-  forceIJK: {title:"Force IJK", description:"Force the output of IJK for G2/G3 when not using R mode.", type:"boolean"},
-  useParametricFeed:  {title:"Parametric feed", description:"Specifies the feed value that should be output using a Q value.", type:"boolean"},
-  showNotes: {title:"Show notes", description:"Writes operation notes as comments in the outputted code.", type:"boolean"},
-  useSmoothing: {title:"Use smoothing", description:"Specifies if smoothing should be used or not.", type:"boolean"},
-  usePitchForTapping: {title:"Use pitch for tapping", description:"Enables the use of pitch instead of feed for the F-word in canned tapping cycles. Your CNC control must be setup for pitch mode!", type:"boolean"},
-  useG95: {title:"Use G95", description:"Use IPR/MPR instead of IPM/MPM.", type:"boolean"},
-  useG54x4: {title:"Use G54.4", description:"Fanuc 30i supports G54.4 for workpiece error compensation.", type:"boolean"},
-  useSubroutines: {title:"Use subroutines", description:"Specifies that subroutines per each operation should be generated.", type:"boolean"},
-  useFilesForSubprograms: {title:"Use files for subroutines", description:"If enabled, subroutines will be saved as individual files.", type:"boolean"},
-  useSubroutinePatterns: {title:"Use subroutine patterns", description:"Generates subroutines for patterned operation.", type:"boolean"},
-  useSubroutineCycles: {title: "Use subroutine cycles", description: "Generates subroutines for cycle operations on same holes.", type: "boolean"},
-  useG28: {title: "G28 Safe retracts", description: "Disable to use G53 instead of G28 for retracts.", type: "boolean"},
+  writeMachine: {
+    title      : "Write machine", 
+    description: "Output the machine settings in the header of the code.", 
+    group      : "formats", 
+    type       : "boolean"
+  },
+  writeTools: {
+    title:"Write tool list", 
+    description: "Output a tool list in the header of the code.", 
+    group      : "formats", 
+    type       : "boolean"
+  },
+  preloadTool: {
+    title      : "Preload tool", 
+    description: "Preloads the next tool at a tool change (if any).", 
+    group      : "preferences", 
+    type       : "boolean"
+  },
+  showSequenceNumbers: {
+    title      : "Use sequence numbers", 
+    description: "Use sequence numbers for each block of outputted code.", 
+    group      : "formats", 
+    type       : "boolean"
+  },
+  sequenceNumberStart: {
+    title      : "Start sequence number", 
+    description: "The number at which to start the sequence numbers.", 
+    group      : "formats", 
+    type       : "integer"
+  },
+  sequenceNumberIncrement: {
+    title      : "Sequence number increment", 
+    description: "The amount by which the sequence number is incremented by in each block.", 
+    group      : "formats", 
+    type       : "integer"
+  },
+  optionalStop: {
+    title      : "Optional stop", 
+    description: "Outputs optional stop code during when necessary in the code.",
+    group      : "preferences", 
+    type       : "boolean"
+  },
+  o8: {
+    title      : "8 Digit program number", 
+    description: "Specifies that an 8 digit program number is needed.",
+    group      : "formats", 
+    type       : "boolean"
+  },
+  separateWordsWithSpace: {
+    title      : "Separate words with space", 
+    description: "Adds spaces between words if 'yes' is selected.",
+    group      : "formats",
+    type       : "boolean"
+  },
+  allow3DArcs: {
+    title      : "Allow 3D arcs", 
+    description: "Specifies whether 3D circular arcs are allowed.",
+    group      : "preferences",
+    type       : "boolean"
+  },
+  useRadius: {
+    title      : "Radius arcs", 
+    description: "If yes is selected, arcs are outputted using radius values rather than IJK.", 
+    group      : "preferences",
+    type       : "boolean"
+  },
+  forceIJK: {
+    title      : "Force IJK", 
+    description: "Force the output of IJK for G2/G3 when not using R mode.", 
+    group      : "preferences",
+    type       : "boolean"
+  },
+  useParametricFeed:  {
+    title       : "Parametric feed", 
+    description : "Specifies the feed value that should be output using a Q value.",
+    group       : "preferences", 
+    type        : "boolean"
+  },
+  showNotes: {
+    title      : "Show notes", 
+    description: "Writes operation notes as comments in the outputted code.",
+    group      : "formats", 
+    type       : "boolean"
+  },
+  useSmoothing: {
+    title      : "Use smoothing", 
+    description: "Specifies if smoothing should be used or not.",
+    group      : "preferences", 
+    type       : "boolean"
+  },
+  usePitchForTapping: {
+    title      : "Use pitch for tapping", 
+    description: "Enables the use of pitch instead of feed for the F-word in canned tapping cycles. Your CNC control must be setup for pitch mode!", 
+    group      : "preferences",
+    type       : "boolean"
+  },
+  useG95: {
+    title      : "Use G95", 
+    description: "Use IPR/MPR instead of IPM/MPM.",
+    group      : "preferences", 
+    type       : "boolean"
+  },
+  useG54x4: {
+    title      : "Use G54.4", 
+    description: "Fanuc 30i supports G54.4 for workpiece error compensation.",
+    group      : "multiAxis",
+    type       : "boolean"
+  },
+  useSubroutines: {
+    title      : "Use subroutines", 
+    description: "Specifies that subroutines per each operation should be generated.", 
+    type:"boolean"
+  },
+  useFilesForSubprograms: {
+    title      : "Use files for subroutines", 
+    description: "If enabled, subroutines will be saved as individual files.",
+    group      : "preferences",
+    type       : "boolean"
+  },
+  useSubroutinePatterns: {
+    title      : "Use subroutine patterns", 
+    description: "Generates subroutines for patterned operation.", 
+    group      : "preferences",
+    type       : "boolean"
+  },
+  useSubroutineCycles: {
+    title      : "Use subroutine cycles", 
+    description: "Generates subroutines for cycle operations on same holes.", 
+    group      : "preferences",
+    type       : "boolean"
+  },
+  useG28: {
+    title      : "G28 Safe retracts", 
+    description: "Disable to use G53 instead of G28 for retracts.",
+    group      : "homePositions", 
+    type       : "boolean"
+  },
   useRigidTapping: {
-    title: "Use rigid tapping",
+    title      : "Use rigid tapping",
     description: "Select 'Yes' to enable, 'No' to disable, or 'Without spindle direction' to enable rigid tapping without outputting the spindle direction block.",
-    type: "enum",
+    group      : "preferences",
+    type       : "enum",
     values:[
       {title:"Yes", id:"yes"},
       {title:"No", id:"no"},
       {title:"Without spindle direction", id:"without"}
     ]
+  },
+  chipTransport: {
+    title      : "Use chip management",
+    description: "Enable to turn on chip transport at start of program.",
+    group      : "preferences",
+    type       : "enum",
+    values     : [
+      //{title:"Always On", id:"on"},
+      {title:"Automatic", id:"auto"},
+      {title:"Passthru Only", id:"pass"}
+    ],
+    value: "auto",
+    scope: "post"
   }
+  /*coolantFlush: {
+    title      : "Use flush coolant",
+    description: "Enable to turn on flush coolant with spindle during cutting.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  }
+  */
+  
 };
 
 var singleLineCoolant = false; // specifies to output multiple coolant codes in one line rather than in separate lines
@@ -335,8 +484,9 @@ function onOpen() {
       warning(localize("Program number is reserved by tool builder."));
     }
     oFormat = createFormat({width:(properties.o8 ? 8 : 4), zeropad:true, decimals:0});
-    if (programComment) {
-      writeln("O" + oFormat.format(programId) + " (" + filterText(String(programComment).toUpperCase(), permittedCommentChars) + ")");
+    var jobdescription = (getGlobalParameter("job-description"))
+    if (jobdescription) {
+      writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
     } else {
       writeln("O" + oFormat.format(programId));
     }
@@ -345,6 +495,22 @@ function onOpen() {
     error(localize("Program name has not been specified."));
     return;
   }
+
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date
+	if (hasGlobalParameter("generated-at")) {
+    var datetime = getGlobalParameter("generated-at");
+		  writeComment("Program Posted: " + datetime + "UTC0");
+		  }
+
+  // dump post properties  
+  writeComment("Chip management=" + properties.chipTransport)
 
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
@@ -364,7 +530,7 @@ function onOpen() {
     }
   }
 
-  //Probing Surface Inspection
+  // Probing Surface Inspection
   if (typeof inspectionWriteVariables == "function") {
     inspectionWriteVariables();
   }
@@ -452,6 +618,11 @@ function onOpen() {
     writeBlock(gUnitModal.format(21));
     break;
   }
+  
+  //chip transport "always on" disabled to keep flushing from staying on during tool changes
+  //if (properties.chipTransport == "on") {
+  //  onCommand(COMMAND_START_CHIP_TRANSPORT);
+  //}
   
   if (properties.useG95 && properties.useParametricFeed) {
     error(localize("Parametric feed is not supported when using G95."));
@@ -1212,10 +1383,17 @@ function onSection() {
   }
   
   if (insertToolCall) {
+    
     forceWorkPlane();
     
     onCommand(COMMAND_COOLANT_OFF);
-  
+
+    if (properties.chipTransport == "auto" || "pass") {
+      if (!isFirstSection() && insertToolCall) {
+        onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+      }
+    }
+
     if (!isFirstSection() && properties.optionalStop) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
@@ -1287,8 +1465,6 @@ function onSection() {
         sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4)
       );
     }
-
-    onCommand(COMMAND_START_CHIP_TRANSPORT);
     if (forceMultiAxisIndexing || !is3D() || machineConfiguration.isMultiAxisConfiguration()) {
       // writeBlock(mFormat.format(xxx)); // shortest path traverse
     }
@@ -1363,6 +1539,28 @@ function onSection() {
 
   // set coolant after we have positioned at Z
   setCoolant(tool.coolant);
+
+  /** // start coolant flush
+  if (tool.type != TOOL_PROBE) {
+    var flush = properties.coolantFlush  //refer to property to use or not
+    if(flush){
+      if(tool.diameter >= .34 && tool.coolant){
+        writeBlock(mFormat.format(15) //M15 on 2011 MAM72-25V
+        );
+      }
+    }
+  }
+  */
+  
+  // chip transport automatic start operation
+  if (tool.type != TOOL_PROBE) {
+      if(properties.chipTransport == "auto"){      
+        if(tool.diameter >= .34){
+          onCommand(COMMAND_START_CHIP_TRANSPORT) //chip management commands flush start and conveyor start
+        }
+      }
+  }
+    
 
   forceAny();
   gMotionModal.reset();
@@ -2618,8 +2816,10 @@ function onCommand(command) {
 	writeBlock(mFormat.format(24)); //unlock 5th
     return;
   case COMMAND_START_CHIP_TRANSPORT:
+    writeBlock(mFormat.format(15)); //using M15 coolant flush strart to start chip conveyor on 2011
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
+    writeBlock(mFormat.format(16)); //using M16 coolant flush stop to stop chip conveyor on 2011
     return;
   case COMMAND_BREAK_CONTROL:
     return;
@@ -2652,6 +2852,9 @@ function onSectionEnd() {
   }
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
+    if (properties.chipTransport == "auto"){
+      onCommand(COMMAND_STOP_CHIP_TRANSPORT); //chip management stop if next section doesn't have coolant
+    }
   }
 
   if (true) {
@@ -2782,6 +2985,8 @@ function onClose() {
   onCommand(COMMAND_COOLANT_OFF);
   retracted = true;
   disableLengthCompensation(true);
+
+  onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop chip transport at end of program
 
   writeRetract(Z); // retract
   

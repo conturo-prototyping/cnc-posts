@@ -60,13 +60,17 @@
   13 - 7/22/2022 Billy
       -added chip transport logic for off/on/auto
 
+  14 - 8/8/2022 Billy
+      -rearranged some things
+      -added a post properties dump at the top of the program
+
 
 
 
 */
 
 description = "CP - Hyundai - Mill - Fanuc 18i";
-vendor = "Fanuc";
+vendor = "Hyundai";
 vendorUrl = "https://machine.hyundai-wia.com/usa/";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
@@ -334,7 +338,7 @@ properties = {
       {title:"Passthru Only", id:"pass"}
     ],
     value: "auto",
-    scope      : "post"
+    scope: "post"
   },
   coolantFlush: {
     title      : "Use flush coolant",
@@ -728,6 +732,22 @@ function onOpen() {
     return;
   }
 
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date
+	if (hasGlobalParameter("generated-at")) {
+    var datetime = getGlobalParameter("generated-at");
+		  writeComment("Program Posted: " + datetime + "UTC0");
+		  }
+  
+  // dump post properties  
+  writeComment("Chip management=" + getProperty("chipTransport"))
+
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
   var model = machineConfiguration.getModel();
@@ -745,19 +765,6 @@ function onOpen() {
       writeComment("  " + localize("description") + ": "  + description);
     }
   }
-
-  // write user name	
-  if (hasGlobalParameter("username")) {
-    var usernameprint = getGlobalParameter("username");
-		  writeln("");
-		  writeComment("Username: " + usernameprint);
-		  }
-		  
-  // write date
-	if (hasGlobalParameter("generated-at")) {
-    var datetime = getGlobalParameter("generated-at");
-		  writeComment("Program Posted: " + datetime + "UTC0");
-		  }
 
   //Probing Surface Inspection
   if (typeof inspectionWriteVariables == "function") {
