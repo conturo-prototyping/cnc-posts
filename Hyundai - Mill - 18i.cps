@@ -52,7 +52,7 @@
       - removed automatic AICC for now, just Q1 and Q0 to turn on and off
             >> future issues to solve <<
               *z retract every time AICC R value is changed. might be unavoidable
-              *jet and flush logic should probably be moved to a function that happens seporately
+              *jet and flush logic should probably be moved to a function that happens seporately, for now see "Coolant flush" for jet operation
   
   12 - 7/5/2022 Billy
       -set maximum sequence number to 99999 and then restarts count
@@ -63,6 +63,10 @@
   14 - 8/8/2022 Billy
       -rearranged some things
       -added a post properties dump at the top of the program
+      -notated a few items
+      -cleared up termanology
+      -added chip screw shutoff at the end of every program
+      
 
 
 
@@ -328,7 +332,7 @@ properties = {
     scope      : "post"
   },
   chipTransport: {
-    title      : "Use chip transport",
+    title      : "Use external chip conveyor",
     description: "Enable to turn on chip transport at start of program.",
     group      : "preferences",
     type       : "enum",
@@ -746,7 +750,8 @@ function onOpen() {
 		  }
   
   // dump post properties  
-  writeComment("Chip management=" + getProperty("chipTransport"))
+  writeComment("External chip conveyor=" + getProperty("chipTransport"))
+  writeComment("Flush Coolant=" + getProperty("coolantFlush"))
 
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
@@ -1883,10 +1888,10 @@ function onSection() {
   if (tool.type != TOOL_PROBE) {
     var flush = getProperty("coolantFlush")  //refer to property to use or not
     if(flush){
-      writeBlock(mFormat.format(51) //M51 on hyundai for coolant flush in APC door and main door
+      writeBlock(mFormat.format(51) //M51 on Hyundai for coolant flush on APC door and main door
       );
       if(tool.diameter >= .34 && tool.coolant){
-        writeBlock(mFormat.format(47) //M47 on hyundai for coolant jets overhead
+        writeBlock(mFormat.format(47) //M47 on Hyundai for coolant jets overhead
         );
       }
     }
@@ -1897,7 +1902,7 @@ function onSection() {
   if (tool.type != TOOL_PROBE) {
       if(getProperty("chipTransport") == "auto"){      
         if(tool.diameter >= .34){
-         onCommand(COMMAND_START_CHIP_TRANSPORT) //hyundai external chip conveyor
+         onCommand(COMMAND_START_CHIP_TRANSPORT) //start external chip conveyor
         }
       }
   }
@@ -3193,7 +3198,7 @@ function onSectionEnd() {
   }
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
-    if (getProperty("chipTransport") == "automatic"){
+    if (getProperty("chipTransport") == "auto"){ //chip transport stop if next section doesn't have coolant
       onCommand(COMMAND_STOP_CHIP_TRANSPORT);
     }
   }
@@ -3483,7 +3488,9 @@ function onClose() {
 
   onCommand(COMMAND_COOLANT_OFF);
 
-  onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+  onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop extrenal conveyor at end of program
+
+  writeln(mFormat(37)) //always stop chip screws at end of program
 
   writeRetract(Z); // retract
 
