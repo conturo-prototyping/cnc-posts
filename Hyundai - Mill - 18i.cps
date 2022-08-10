@@ -2,7 +2,7 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 13  $
+  $Revision: 15  $
   $Date:  $
 
   Hyundai Fanuc 18i-MB post processor configuration
@@ -55,17 +55,21 @@
               *jet and flush logic should probably be moved to a function that happens seporately, for now see "Coolant flush" for jet operation
   
   12 - 7/5/2022 Billy
-      -set maximum sequence number to 99999 and then restarts count
+      - set maximum sequence number to 99999 and then restarts count
   
   13 - 7/22/2022 Billy
-      -added chip transport logic for off/on/auto
+      - added chip transport logic for off/on/auto
 
   14 - 8/8/2022 Billy
-      -rearranged some things
-      -added a post properties dump at the top of the program
-      -notated a few items
-      -cleared up termanology
-      -added chip screw shutoff at the end of every program
+      - rearranged some things
+      - added a post properties dump at the top of the program
+      - notated a few items
+      - cleared up termanology
+      - added chip screw shutoff at the end of every program
+
+  15 - 8/9/2022 Billy
+      - "mformat" mistake mixed
+      - cleaned up versioning format
       
 
 
@@ -3490,7 +3494,7 @@ function onClose() {
 
   onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop extrenal conveyor at end of program
 
-  writeln(mFormat(37)) //always stop chip screws at end of program
+  writeln(mFormat.format(37)) //always stop chip screws at end of program
 
   writeRetract(Z); // retract
 
