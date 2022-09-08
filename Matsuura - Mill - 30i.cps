@@ -4,7 +4,7 @@
   
   Matsuura Fanuc 30i post processor
 
-  $Revision: 6  $
+  $Revision: 7  $
   $Date:  $
 
   Matsuura Fanuc 30i post processor configuration
@@ -30,6 +30,10 @@
     - job description is now what feeds the program name, same as our other posts
     - dump post properties at the top of the program
     - added groups and formating to post properties
+
+  7 - 9/8/2022
+  Billy @ CP
+    - moved the B axis limit from 110 to 112.5
   
     */
 
@@ -430,7 +434,7 @@ function onOpen() {
   gRotationModal.format(69); // Default to G69 Rotation Off
 
   if (true) { // note: setup your machine here
-    var bAxis = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-110,110], cyclic:false, preference:-1});
+    var bAxis = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-112.5,112.5], cyclic:false, preference:-1});
     var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360,0], cyclic:true});
     machineConfiguration = new MachineConfiguration(bAxis, cAxis);
 
