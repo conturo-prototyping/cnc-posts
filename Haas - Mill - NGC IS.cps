@@ -1,8 +1,8 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 8 $
-  $Date: 2022-03-31 $
+  $Revision: 9 $
+  $Date: 2022-10-04 $
   
 
     Conturo Prototyping Version Info
@@ -40,6 +40,11 @@
     8 5/26/2022
     Billy @ CP
       -updated spindle RPM limits on UMCs
+    
+    9 10/4/2022
+    Billy @ CP
+      -changed the way M1 works. Made it so it always happens at every tool change and the check box makes it happen between every tool path.
+      -clamp codes defaulted to off
 
 
 */
@@ -96,7 +101,7 @@ properties = {
     title      : "Machine model",
     description: "Specifies the pre-configured machine model.",
     type       : "enum",
-    group      : 0,
+    group      : "Machine",
     values     : [
       {title:"None", id:"none"},
       {title:"UMC-500", id:"umc-500"},
@@ -111,7 +116,7 @@ properties = {
     title      : "Has A-axis rotary",
     description: "Enable if the machine has an A-axis table/trunnion. Check the table direction on the machine and use the (Reversed) selection if the table is moving in the opposite direction.",
     type       : "enum",
-    group      : 1,
+    group      : "Machine Setup",
     values     : [
       {title:"No", id:"false"},
       {title:"Yes", id:"true"},
@@ -124,7 +129,7 @@ properties = {
     title      : "Has B-axis rotary",
     description: "Enable if the machine has a B-axis table/trunnion. Check the table direction on the machine and use the (Reversed) selection if the table is moving in the opposite direction.",
     type       : "enum",
-    group      : 1,
+    group      : "Machine Setup",
     values     : [
       {title:"No", id:"false"},
       {title:"Yes", id:"true"},
@@ -137,7 +142,7 @@ properties = {
     title      : "Has C-axis rotary",
     description: "Enable if the machine has a C-axis table. Specifies a trunnion setup if an A-axis or B-axis is defined. Check the table direction on the machine and use the (Reversed) selection if the table is moving in the opposite direction.",
     type       : "enum",
-    group      : 1,
+    group      : "Machine Setup",
     values     : [
       {title:"No", id:"false"},
       {title:"Yes", id:"true"},
@@ -149,7 +154,7 @@ properties = {
   useDPMFeeds: {
     title      : "Rotary moves use DPM feeds",
     description: "Enable to output DPM feeds, disable for Inverse Time feeds with rotary axes moves.",
-    group      : 1,
+    group      : "Machine Setup",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -157,7 +162,7 @@ properties = {
   useTCP: {
     title      : "Use TCPC programming",
     description: "The control supports Tool Center Point Control programming.",
-    group      : 1,
+    group      : "Machine Setup",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -165,7 +170,7 @@ properties = {
   useMultiAxisFeatures: {
     title      : "Use DWO",
     description: "Specifies that the Dynamic Work Offset feature (G254/G255) should be used.",
-    group      : 1,
+    group      : "Machine Setup",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -173,7 +178,7 @@ properties = {
   preloadTool: {
     title      : "Preload tool",
     description: "Preloads the next tool at a tool change (if any).",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -181,15 +186,15 @@ properties = {
   chipTransport: {
     title      : "Use chip transport",
     description: "Enable to turn on chip transport at start of program.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
   optionalStop: {
     title      : "Optional stop",
-    description: "Specifies that optional stops M1 should be output at tool changes.",
-    group      : 2,
+    description: "Specifies that optional stops M1 should be output the biginning of every tool path. M1 will always be output at every tool change.",
+    group      : "preferences",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -197,7 +202,7 @@ properties = {
   separateWordsWithSpace: {
     title      : "Separate words with space",
     description: "Adds spaces between words if 'yes' is selected.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -205,7 +210,7 @@ properties = {
   useRadius: {
     title      : "Radius arcs",
     description: "If yes is selected, arcs are output using radius values rather than IJK.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -213,7 +218,7 @@ properties = {
   useParametricFeed: {
     title      : "Parametric feed",
     description: "Parametric feed values based on movement type are output.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -221,7 +226,7 @@ properties = {
   useG0: {
     title      : "Use G0",
     description: "Specifies that G0s should be used for rapid moves when moving along a single axis.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -229,6 +234,7 @@ properties = {
   safePositionMethod: {
     title      : "Safe Retracts",
     description: "Select your desired retract option. 'Clearance Height' retracts to the operation clearance height.",
+    group      : "preferences",
     type       : "enum",
     values     : [
       {title:"G28", id:"G28"},
@@ -257,7 +263,7 @@ properties = {
   homePositionCenter: {
     title      : "Home position center",
     description: "Enable to center the part along X at the end of program for easy access. Requires a CNC with a moving table.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -265,7 +271,7 @@ properties = {
   optionallyCycleToolsAtStart: {
     title      : "Optionally cycle tools at start",
     description: "Cycle through each tool used at the beginning of the program when block delete is turned off.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -273,7 +279,7 @@ properties = {
   optionallyMeasureToolsAtStart: {
     title      : "Optionally measure tools at start",
     description: "Measure each tool used at the beginning of the program when block delete is turned off.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -281,7 +287,7 @@ properties = {
   forceHomeOnIndexing: {
     title      : "Force XY home position on indexing",
     description: "Move XY to their home positions on multi-axis indexing.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -289,7 +295,7 @@ properties = {
   toolBreakageTolerance: {
     title      : "Tool breakage tolerance",
     description: "Specifies the tolerance for which tool break detection will raise an alarm.",
-    group      : 2,
+    group      : "preferences",
     type       : "spatial",
     value      : 0.1,
     scope      : "post"
@@ -297,7 +303,7 @@ properties = {
   toolArmDrive: {
     title      : "Machine has a tool setting probe arm",
     description: "Outputs M104/M105 to extend/retract the tool setting probe arm",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -312,7 +318,7 @@ properties = {
   safeStartAllOperations: {
     title      : "Safe start all operations",
     description: "Write optional blocks at the beginning of all operations that include all commands to start program.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -320,7 +326,7 @@ properties = {
   fastToolChange: {
     title      : "Fast tool change",
     description: "Skip spindle off, coolant off, and Z retract to make tool change quicker.",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -328,7 +334,7 @@ properties = {
   useG95forTapping: {
     title      : "Use G95 for tapping",
     description: "use IPR/MPR instead of IPM/MPM for tapping",
-    group      : 2,
+    group      : "preferences",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -336,7 +342,7 @@ properties = {
   safeRetractDistance: {
     title      : "Safe retract distance",
     description: "Specifies the distance to add to retract distance when rewinding rotary axes.",
-    group      : 2,
+    group      : "preferences",
     type       : "spatial",
     value      : 0,
     scope      : "post"
@@ -351,14 +357,14 @@ properties = {
       {title:"Cycles", id:"cycles"},
       {title:"Patterns", id:"patterns"}
     ],
-    group: 3,
+    group: "preferences",
     value: "none",
     scope: "post"
   },
   writeMachine: {
     title      : "Write machine",
     description: "Output the machine settings in the header of the code.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -366,7 +372,7 @@ properties = {
   writeTools: {
     title      : "Write tool list",
     description: "Output a tool list in the header of the code.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -374,7 +380,7 @@ properties = {
   writeVersion: {
     title      : "Write version",
     description: "Write the version number in the header of the code.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -382,7 +388,7 @@ properties = {
   showSequenceNumbers: {
     title      : "Use sequence numbers",
     description: "Use sequence numbers for each block of outputted code.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -390,7 +396,7 @@ properties = {
   sequenceNumberStart: {
     title      : "Start sequence number",
     description: "The number at which to start the sequence numbers.",
-    group      : 4,
+    group      : "formats",
     type       : "integer",
     value      : 10,
     scope      : "post"
@@ -398,7 +404,7 @@ properties = {
   sequenceNumberIncrement: {
     title      : "Sequence number increment",
     description: "The amount by which the sequence number is incremented by in each block.",
-    group      : 4,
+    group      : "formats",
     type       : "integer",
     value      : 5,
     scope      : "post"
@@ -406,7 +412,7 @@ properties = {
   sequenceNumberOnlyOnToolChange: {
     title      : "Block number only on tool change",
     description: "Specifies that block numbers should only be output at tool changes.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -414,7 +420,7 @@ properties = {
   showNotes: {
     title      : "Show notes",
     description: "Enable to output notes for operations.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -422,7 +428,7 @@ properties = {
   useM130PartImages: {
     title      : "Include M130 part images",
     description: "Enable to include M130 part images with the NC file.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -430,7 +436,7 @@ properties = {
   useM130ToolImages: {
     title      : "Include M130 tool images",
     description: "Enable to include M130 tool images with the NC file.",
-    group      : 4,
+    group      : "formats",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -439,7 +445,7 @@ properties = {
     title      : "Coolant pressure",
     description: "Select the coolant pressure if equipped with a Variable Frequency Drive.  Select 'Default' if this option is not installed.",
     type       : "enum",
-    group      : 2,
+    group      : "formats",
     values     : [
       {title:"Default", id:""},
       {title:"Low", id:"P0"},
@@ -452,7 +458,7 @@ properties = {
   singleResultsFile: {
     title      : "Create single results file",
     description: "Set to false if you want to store the measurement results for each probe / inspection toolpath in a separate file",
-    group      : 0,
+    group      : "formats",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -461,7 +467,7 @@ properties = {
     title      : "Use clamp codes",
     description: "Specifies whether clamp codes for rotary axes should be output. For simultaneous toolpaths rotary axes will always get unclamped.",
     type       : "boolean",
-    value      : true,
+    value      : false,
     scope      : "post"
   }
 };
@@ -2213,13 +2219,18 @@ function onSection() {
     }
   }
 
+  //optional stop at the beginning of every tool path
+  if (!isFirstSection() && getProperty("optionalStop")) {  
+    onCommand(COMMAND_OPTIONAL_STOP);
+  }
+
   if (insertToolCall || operationNeedsSafeStart) {
 
     if (getProperty("useM130ToolImages")) {
       writeBlock(mFormat.format(130), "(tool" + tool.number + ".png)");
     }
 
-    if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
+    if (!isFirstSection() && !(getProperty("optionalStop")) && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
 
