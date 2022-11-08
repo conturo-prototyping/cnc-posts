@@ -2,7 +2,7 @@
   h-AAS post processor configuration.
 
   $Revision: 10 $
-  $Date: 2022-10-08 $
+  $Date: 2022-11-08 $
   
 
     Conturo Prototyping Version Info
@@ -50,6 +50,17 @@
     Billy @ CP
       -fixed safe retracts to work after the tool change for avoiding parts in machines like the 750
 
+
+    11 11/8/2022
+    Billy @ CP
+      -chip conveyor logic imported from hyundai and matsuura posts
+      -chip conveyor setting override when in auto mode and post checkbox is set
+      -added haas mist collector (tested by Justin to make sure the M-code runs on machines without mist option, OK)
+      -added MOM type and MQL time tool mist systems
+      -added GR408 to the machine list for Z and Y retracts and tool change stuff
+      -in process of adding a manual tool change option (testing by Joe)
+      -power off at M30 disabled option at beginning of program
+      -added settings categroy to post options for machine settings
 
 
 */
@@ -112,6 +123,7 @@ properties = {
       {title:"UMC-500", id:"umc-500"},
       {title:"UMC-750", id:"umc-750"},
       {title:"UMC-1000", id:"umc-1000"},
+      {title:"GR-408", id:"gr-408"},
       //{title:"UMC-1600-H", id:"umc-1600"}
     ],
     value: "none",
@@ -188,18 +200,61 @@ properties = {
     value      : true,
     scope      : "post"
   },
-  chipTransport: {
-    title      : "Use chip transport",
-    description: "Enable to turn on chip transport at start of program.",
+  manualTool: {
+    title      : "Manual Tool Change",
+    description: "Manual tool change Configuration to use for manual tool changes. Automatic uses machine selection for tool changer information. Other options specify control, ATC capacity, and tool number to be sacrificed for tool changes",
     group      : "preferences",
-    type       : "boolean",
-    value      : true,
+    type       : "enum",
+    values     : [
+      {title:"None", id:"none"},
+      {title:"Automatic", id:"auto"},
+      {title:"Classic 10ATC #10", id:"PRE-10-10"},
+      {title:"Classic 10ATC #9", id:"PRE-10-9"},
+      {title:"Classic 10ATC #7", id:"PRE-10-7"},
+      {title:"NGC 24ATC #20", id:"NGC-10-9"}
+    ],
+    value      : "none",
+    scope      : "post"
+  },
+  chipTransport: {
+    title      : "Chip conveyor",
+    description: "Chip conveyor or screw setting. Automatic runs the chip conveyor as needed for large roughing tools",
+    group      : "preferences",
+    type       : "enum",
+    values     : [
+      {title:"Always On", id:"on"},
+      {title:"Automatic", id:"auto"},
+      {title:"Passthru Only", id:"pass"}
+    ],
+    value: "auto",
+    scope: "post"
+  },
+  mistType: {
+    title      : "Tool mist type",
+    description: "Select the type of tool mist being used",
+    group      : "preferences",
+    type       : "enum",
+    values     : [
+      {title:"MQL", id:"mql"},
+      {title:"MOM", id:"mom1"},
+      {title:"HIGH MOM", id:"mom2"},
+      {title:"SUPER MOM", id:"mom3"}
+    ],
+    value      : "mql",
     scope      : "post"
   },
   optionalStop: {
     title      : "Optional stop",
     description: "Specifies that optional stops M1 should be output the biginning of every tool path. M1 will always be output at every tool change.",
     group      : "preferences",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  mistCollector: {
+    title      : "Mist collector",
+    description: "Enable Haas mist collector M code",
+    group      : "Settings",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -249,22 +304,6 @@ properties = {
     value: "G53",
     scope: "post"
   },
-  // smoothing option commented out by Billy 3-10-2022, we don't need this to be an option
-  //useSmoothing: {
-    //title      : "Use G187",
-    //description: "G187 smoothing mode.",
-    //type       : "enum",
-    //group      : 1,
-    //values     : [
-      //{title:"Off", id:"-1"},
-      //{title:"Automatic", id:"9999"},
-      //{title:"Rough", id:"1"},
-      //{title:"Medium", id:"2"},
-      //{title:"Finish", id:"3"}
-    //],
-    //value: "-1",
-    //scope: "post"
-  //},
   homePositionCenter: {
     title      : "Home position center",
     description: "Enable to center the part along X at the end of program for easy access. Requires a CNC with a moving table.",
@@ -470,9 +509,26 @@ properties = {
   },
   useClampCodes: {
     title      : "Use clamp codes",
-    description: "Specifies whether clamp codes for rotary axes should be output. For simultaneous toolpaths rotary axes will always get unclamped.",
+    description: "Specifies whether clamp codes for rotary axes should be output. For simultaneous toolpaths rotary axes will always get unclamped. Haas handles clamping automatically with rotray movements",
+    group      : "Settings",
     type       : "boolean",
     value      : false,
+    scope      : "post"
+  },
+  m30Power: {
+    title      : "Disable power-off at M30",
+    description: "Select to disable power off at M30 setting #2 in machine. Useful if the last person enabled this setting for a long cycle-time part",
+    group      : "Settings",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  setChip: {
+    title      : "Set chip conveyor interval",
+    description: "Select to override chip conveyor interval settings #114 and #115 when chip conveyor is set to automatic",
+    group      : "Settings",
+    type       : "boolean",
+    value      : true,
     scope      : "post"
   }
 };
@@ -486,22 +542,6 @@ wcsDefinitions = {
   ]
 };
 
-var singleLineCoolant = false; // specifies to output multiple coolant codes in one line rather than in separate lines
-// samples:
-// {id: COOLANT_THROUGH_TOOL, on: 88, off: 89}
-// {id: COOLANT_THROUGH_TOOL, on: [8, 88], off: [9, 89]}
-// {id: COOLANT_THROUGH_TOOL, on: "M88 P3 (myComment)", off: "M89"}
-var coolants = [
-  {id:COOLANT_FLOOD, on:8},
-  {id:COOLANT_MIST},
-  {id:COOLANT_THROUGH_TOOL, on:88, off:89},
-  {id:COOLANT_AIR, on:83, off:84},
-  {id:COOLANT_AIR_THROUGH_TOOL, on:73, off:74},
-  {id:COOLANT_SUCTION},
-  {id:COOLANT_FLOOD_MIST},
-  {id:COOLANT_FLOOD_THROUGH_TOOL, on:[88, 8], off:[89, 9]},
-  {id:COOLANT_OFF, off:9}
-];
 
 // old machines only support 4 digits
 var oFormat = createFormat({width:5, zeropad:true, decimals:0});
@@ -622,8 +662,36 @@ probeMultipleFeatures = true;
 var maximumSpindleRPM = 15000;
 var homePositionCenter = false;
 
+
 // used to convert blocks to optional for safeStartAllOperations, might get used outside of onSection
 var operationNeedsSafeStart = false;
+
+var singleLineCoolant = false; // specifies to output multiple coolant codes in one line rather than in separate lines
+// samples:
+// {id: COOLANT_THROUGH_TOOL, on: 88, off: 89}
+// {id: COOLANT_THROUGH_TOOL, on: [8, 88], off: [9, 89]}
+// {id: COOLANT_THROUGH_TOOL, on: "M88 P3 (myComment)", off: "M89"}
+
+
+  /*
+  //left off here <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<!!!!!!!!!!!!!!!!!!!!
+
+  */
+  var coolants = 
+  [
+  {id:COOLANT_FLOOD, on:8},
+  //{id:COOLANT_MIST, on:102, off:104}, //testing
+  {id:COOLANT_THROUGH_TOOL, on:88, off:89},
+  {id:COOLANT_AIR, on:83, off:84},
+  {id:COOLANT_AIR_THROUGH_TOOL, on:73, off:74},
+  {id:COOLANT_SUCTION},
+  {id:COOLANT_FLOOD_MIST, on:150, off:151}, //testing
+  {id:COOLANT_FLOOD_THROUGH_TOOL, on:[88, 8], off:[89, 9]},
+  {id:COOLANT_OFF, off:9} 
+  ];   
+  
+
+
 
 /**
   Writes the specified block.
@@ -845,6 +913,12 @@ function defineMachineModel() {
     machineConfiguration.setRetractPlane(toPreciseUnit(0, IN));
     maximumSpindleRPM = 7500;
     break;
+  case "gr-408":
+    machineConfiguration.setHomePositionX(toPreciseUnit(0, IN));
+    machineConfiguration.setHomePositionY(toPreciseUnit(0, IN));
+    machineConfiguration.setRetractPlane(toPreciseUnit(4.5, IN));
+    maximumSpindleRPM = 15000;
+    break;
   }
   machineConfiguration.setModel(getProperty("machineModel").toUpperCase());
   machineConfiguration.setVendor("Haas Automation");
@@ -875,6 +949,7 @@ function activateMachine() {
   if (!machineConfiguration.isMachineCoordinate(2) && (typeof cOutput != "undefined")) {
     cOutput.disable();
   }
+
 
   // setup usage of multiAxisFeatures
   useMultiAxisFeatures = getProperty("useMultiAxisFeatures") != undefined ? getProperty("useMultiAxisFeatures") :
@@ -1068,6 +1143,9 @@ function onOpen() {
     useDwoForPositioning = false;
   }
 
+
+
+
   gRotationModal.format(69); // Default to G69 Rotation Off
   ssvModal.format(139); // Default to M139 SSV turned off
   mClampModal.format(10); // Default 4th axis modal code to be clamped
@@ -1143,23 +1221,39 @@ function onOpen() {
     }
   }
 
-  // write user name	
-
+  // write user name
   if (hasGlobalParameter("username")) {
     var usernameprint = getGlobalParameter("username");
 		  writeln("");
 		  writeComment("Username: " + usernameprint);
 		  }
 		  
-// write date
+  // write date
 	if (hasGlobalParameter("generated-at")) {
     var datetime = getGlobalParameter("generated-at");
 		  writeComment("Program Posted: " + datetime + "UTC0");
 		  }  
 
+  // dump post properties  
+  writeln("")
+  writeComment("Chip conveyor = " + getProperty("chipTransport"))
+  if (getProperty("mistType") == "mom1"){
+    writeComment("MOM Mist")
+  }
+  if (getProperty("mistType") == "mom2"){
+    writeComment("High MOM Mist")
+  }
+  if (getProperty("mistType") == "mom3"){
+    writeComment("Super MOM !!!!!")
+  }
+  if(getProperty("manualTool") != "none"){
+  writeComment("Manual tool change mode on")
+  }
+
   // dump tool information
   if (getProperty("writeTools")) {
     var zRanges = {};
+    writeln("")
     if (is3D()) {
       var numberOfSections = getNumberOfSections();
       for (var i = 0; i < numberOfSections; ++i) {
@@ -1335,9 +1429,27 @@ function onOpen() {
 
   coolantPressure = getProperty("coolantPressure");
 
-  if (getProperty("chipTransport")) {
+  //chip screws/conveyor auto operation settings
+  if ((getProperty("chipTransport") == "auto")  && (getProperty("machineModel") != "gr-408") && (getProperty("setChip"))){
+    writeBlock("G167 P114 Q6 K10755") //change setting 114 to 6 min (total cycle time)
+    writeBlock("G167 P115 Q5 K10755") //change setting 113 to 5 min (on time)
+  }
+
+  //misc settings to write
+  if (getProperty("m30Power")){
+  writeBlock("G167 P2 Q0 K10755") //Power off at M30 disabled at the start of a program
+  }
+
+
+  //mist collector M code here <<<<
+  if ((getProperty("mistCollector")) && (getProperty("machineModel") != "gr-408")){
+    writeBlock(mFormat.format(158));
+  }
+
+  if (getProperty("chipTransport") == "on") {
     onCommand(COMMAND_START_CHIP_TRANSPORT);
   }
+
   // Probing Surface Inspection
   if (typeof inspectionWriteVariables == "function") {
     inspectionWriteVariables();
@@ -2132,6 +2244,9 @@ function onSection() {
   var forceToolAndRetract = optionalSection && !currentSection.isOptional();
   optionalSection = currentSection.isOptional();
 
+
+  
+
   var insertToolCall = forceToolAndRetract || isFirstSection() ||
     currentSection.getForceToolChange && currentSection.getForceToolChange() ||
     (tool.number != getPreviousSection().getTool().number);
@@ -2235,6 +2350,12 @@ function onSection() {
       writeBlock(mFormat.format(130), "(tool" + tool.number + ".png)");
     }
 
+    if ((getProperty("chipTransport") == "auto") && (getProperty("machineModel") != "gr-408")) {
+      if (!isFirstSection() && insertToolCall) {
+        onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+      }
+    }
+
     if (!isFirstSection() && !(getProperty("optionalStop")) && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
@@ -2243,12 +2364,77 @@ function onSection() {
       warning(localize("Tool number out of range."));
     }
 
-    skipBlock = !insertToolCall;
-    writeToolBlock(
-      "T" + toolFormat.format(tool.number),
-      mFormat.format(6)
-    );
 
+    //tool change section
+    var toolSplitAtc = Number(getProperty("manualTool").match(/[0-9]+/));
+    var toolSplitChange = Number(getProperty("manualTool").match(/[0-9]+$/));
+    var toolControl = String(getProperty("manualTool").match(/[a-zA-Z]+/));
+    //writeln(toolControl);   used for debug
+    //writeln(toolSplitAtc);
+    //writeln(toolSplitChange);
+
+
+
+    skipBlock = !insertToolCall;
+    //manual tool change automatically set based on machine type
+    if(getProperty("manualTool") == "auto"){
+      if(getProperty("machineModel") == "gr-408"){
+      writeComment("preset manual tool change for gr-408"); //using tool 10 as the swap tool. Change this section to change that.
+      if(tool.number > 9){
+        writeToolBlock(
+          "T" + toolFormat.format(10),
+          mFormat.format(6))
+        //xyz location for tool change here <<<<<<<<<<<<
+        writeBlock("T" + toolFormat.format(tool.number))
+        writeBlock(mFormat.format(00));
+        writeComment("Switch to Hand Jog mode and remove current tool from spindle");
+        writeComment("Insert tool " + tool.number + " into spindle");
+        writeComment("Switch back to memory mode and press cycle start");
+        writeBlock("G167 P15 Q1 K10755");
+      }
+      else{
+        writeBlock("G167 P15 Q0 K10755")
+        writeToolBlock(
+          "T" + toolFormat.format(tool.number),
+          mFormat.format(6)
+          )
+      }
+      }
+    }
+    else{
+      // Pre-NGC manual tool change set using custom values
+      if(toolControl == "PRE"){
+    writeComment("manual tool change for Pre-NGC Haas control with ATC" + toolSplitAtc + " using tool number " + toolSplitChange);
+    if((tool.number > toolSplitAtc) || (tool.number == toolSplitChange)){
+      writeToolBlock(
+        "T" + toolFormat.format(toolSplitChange),
+        mFormat.format(6))
+      
+      //xyz location for tool change here
+      writeBlock("T" + toolFormat.format(tool.number));
+      writeBlock(mFormat.format(00));
+      writeComment("Switch to Hand Jog mode and remove current tool from spindle");
+      writeComment("Insert tool " + tool.number + " into spindle");
+      writeComment("Switch back to memory mode and press cycle start");
+      writeBlock("G167 P15 Q1 K10755");
+    }
+    else{
+      writeBlock("G167 P15 Q0 K10755")
+      writeToolBlock(
+        "T" + toolFormat.format(tool.number),
+        mFormat.format(6)
+        )
+    }
+      }
+      //standard tool change if no manual tool change selected
+      else{
+      writeToolBlock(
+        "T" + toolFormat.format(tool.number),
+        mFormat.format(6)
+      )
+      }
+    }
+    
     if (!getProperty("safeStartAllOperations")) {
       retracted = true;
     } else {
@@ -2353,10 +2539,10 @@ function onSection() {
   }
 
   if (newWorkPlane || (insertToolCall && !retracted)) { // go to home position for safety
-    if (!retracted) {
+      if (!retracted) {  
       writeRetract(Z);
     }
-    if (getProperty("forceHomeOnIndexing") && machineConfiguration.isMultiAxisConfiguration()) {
+      if (getProperty("forceHomeOnIndexing") && machineConfiguration.isMultiAxisConfiguration()) {
       writeRetract(X, Y);
     }
   }
@@ -2371,6 +2557,15 @@ function onSection() {
 
   // set coolant after we have positioned at Z
   setCoolant(tool.coolant);
+
+  //chip conveyor automatic operation
+  if (tool.type != TOOL_PROBE) {
+    if((getProperty("chipTransport") == "auto") && ((getProperty("machineModel") != "gr-408"))){      
+      if(tool.diameter >= .34){
+       onCommand(COMMAND_START_CHIP_TRANSPORT) //start chip conveyor
+      }
+    }
+  }
 
   gMotionModal.reset();
 
@@ -2393,7 +2588,7 @@ function onSection() {
     var smoothingfilter;
     if (hasParameter("operation:smoothingFilterTolerance")) {
       smoothingfilter = getParameter("operation:smoothingFilterTolerance")//print smoothing tolerance
-      writeComment("Smoothing: " + (smoothingfilter)); //write smoothing filter
+      writeComment("Smoothing: " + ijkFormat.format(smoothingfilter)); //write smoothing filter
   
       if (smoothingfilter < .0015) {
          smoothingmultiplyer = 1.5;
@@ -2515,19 +2710,23 @@ function onSection() {
   gMotionModal.reset();
   validate(lengthCompensationActive, "Length compensation is not active.");
 
-  if (insertToolCall || operationNeedsSafeStart) {
-    if (getProperty("preloadTool")) {
+  if(getProperty("manualTool") == "none"){
+  //preload tools
+    if (insertToolCall || operationNeedsSafeStart) {
+      if (getProperty("preloadTool")) {
       var nextTool = getNextTool(tool.number);
-      if (nextTool) {
+        if (nextTool) {
         skipBlock = !insertToolCall;
         writeBlock("T" + toolFormat.format(nextTool.number));
-      } else {
+        } 
+        else {
         // preload first tool
         var section = getSection(0);
         var firstToolNumber = section.getTool().number;
         if (tool.number != firstToolNumber) {
           skipBlock = !insertToolCall;
           writeBlock("T" + toolFormat.format(firstToolNumber));
+        }
         }
       }
     }
@@ -3790,6 +3989,20 @@ function setCoolant(coolant) {
 var isSpecialCoolantActive = false;
 
 function getCoolantCodes(coolant) {
+
+  if (getProperty("mistType") == "mom1"){
+    coolants.push({id:COOLANT_MIST, on:["M102 I.078 J3.",83], off:[104,84]});
+  }
+  if (getProperty("mistType") == "mom2"){
+    coolants.push({id:COOLANT_MIST, on:["M102 I.2 J3.",83], off:[104,84]});
+  }
+  if (getProperty("mistType") == "mom3"){
+    coolants.push({id:COOLANT_MIST, on:["M102 I.3 J3.",83], off:[104,84]});
+  }
+  else{
+  coolants.push({id:COOLANT_MIST, on:140, off:142}); //MQL default mist
+  }
+
   isOptionalCoolant = false;
   var multipleCoolantBlocks = new Array(); // create a formatted array to be passed into the outputted line
   if (!coolants) {
@@ -3967,6 +4180,9 @@ function onSectionEnd() {
   }
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
+    if ((getProperty("chipTransport") == "auto") && (getProperty("machineModel") != "gr-408")){ //chip transport stop if next section doesn't have coolant
+      onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+    }
   }
   if ((((getCurrentSectionId() + 1) >= getNumberOfSections()) ||
       (tool.number != getNextSection().getTool().number)) &&
