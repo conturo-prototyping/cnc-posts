@@ -4,8 +4,8 @@
   
   Matsuura Fanuc 30i post processor
 
-  $Revision: 7  $
-  $Date:  $
+  $Revision: 9  $
+  $Date: 2022-11-08 $
 
   Matsuura Fanuc 30i post processor configuration
   3 - 3/18/2022
@@ -34,6 +34,16 @@
   7 - 9/8/2022
   Billy @ CP
     - moved the B axis limit from 110 to 112.5
+
+  8 - 10/4/2022
+  Billy @ CP
+    - changed the way M1 works. Made it so it always happens at every tool change and the check box makes it happen between every tool path.
+
+  9 - 11/8/2022
+  Billy @ CP
+    - added pallet swapping option includiing...
+       - M30 to G65 P9901 with included shutdown for spindle and stuff
+       - notification at beginning of program and end of program
   
     */
 
@@ -88,7 +98,8 @@ properties = {
   useSubroutinePatterns: false, // generates subroutines for patterned operation
   useSubroutineCycles: false, // generates subroutines for cycle operations on same holes
   useRigidTapping: "yes", // output rigid tapping block
-  chipTransport: "auto" // chip transport property
+  chipTransport: "auto", // chip transport property
+  isPalletProgram: false //pallet changing program
 };
 
 // user-defined property definitions
@@ -131,9 +142,17 @@ propertyDefinitions = {
   },
   optionalStop: {
     title      : "Optional stop", 
-    description: "Outputs optional stop code during when necessary in the code.",
+    description: "Specifies that optional stops M1 should be output the biginning of every tool path. M1 will always be output at every tool change.",
     group      : "preferences", 
     type       : "boolean"
+  },
+  isPalletProgram: {
+    title      : "Automatic pallet changing",
+    description: "Set program for automatic pallet changing from a master program.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
   },
   o8: {
     title      : "8 Digit program number", 
@@ -515,6 +534,10 @@ function onOpen() {
 
   // dump post properties  
   writeComment("Chip management=" + properties.chipTransport)
+  if(properties.isPalletProgram){
+    writeComment("Auto pallet changing enabled")
+  }
+
 
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
@@ -1386,6 +1409,11 @@ function onSection() {
     }
   }
   
+  //optional stop at the beginning of every tool path
+  if (!isFirstSection() && getProperty("optionalStop")) {  
+    onCommand(COMMAND_OPTIONAL_STOP);
+  }
+
   if (insertToolCall) {
     
     forceWorkPlane();
@@ -1398,7 +1426,7 @@ function onSection() {
       }
     }
 
-    if (!isFirstSection() && properties.optionalStop) {
+    if (!isFirstSection() && !(properties.optionalStop)) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
 
@@ -1442,7 +1470,7 @@ function onSection() {
       }
     }
   }
-  
+
   if (!isProbeOperation() &&
       !isInspectionOperation(currentSection) &&
       (insertToolCall ||
@@ -3006,9 +3034,18 @@ function onClose() {
 
   writeRetract(X, Y); // return to home
   
-  onImpliedCommand(COMMAND_END);
-  onImpliedCommand(COMMAND_STOP_SPINDLE);
-  writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
+  //onImpliedCommand(COMMAND_END);
+  //onImpliedCommand(COMMAND_STOP_SPINDLE);
+  
+  if(properties.isPalletProgram){
+    writeBlock(mFormat.format(01)); // optional stop
+    writeBlock(mFormat.format(05)); // stop spindle
+    writeBlock(gFormat.format(65) + " P9901"); // return to start program
+    writeComment("Returning to main program 9901");
+  }
+  else{
+    writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
+  }
   if (subprograms.length > 0) {
     writeln("");
     write(subprograms);
