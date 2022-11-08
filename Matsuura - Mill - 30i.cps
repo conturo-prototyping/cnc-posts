@@ -4,7 +4,7 @@
   
   Matsuura Fanuc 30i post processor
 
-  $Revision: 9  $
+  $Revision: 10  $
   $Date: 2022-11-08 $
 
   Matsuura Fanuc 30i post processor configuration
@@ -44,7 +44,11 @@
     - added pallet swapping option includiing...
        - M30 to G65 P9901 with included shutdown for spindle and stuff
        - notification at beginning of program and end of program
-  
+
+  10 - 11/8/2022
+  Billy @ CP
+    - fixed M1 option stop
+
     */
 
 description = "CP - Matsuura - Mill - Fanuc 30i";
@@ -1410,7 +1414,7 @@ function onSection() {
   }
   
   //optional stop at the beginning of every tool path
-  if (!isFirstSection() && getProperty("optionalStop")) {  
+  if (!isFirstSection() && properties.optionalStop) {  
     onCommand(COMMAND_OPTIONAL_STOP);
   }
 
