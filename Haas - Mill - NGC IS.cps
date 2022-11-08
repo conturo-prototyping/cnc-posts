@@ -1,8 +1,8 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 9 $
-  $Date: 2022-10-04 $
+  $Revision: 10 $
+  $Date: 2022-10-08 $
   
 
     Conturo Prototyping Version Info
@@ -45,6 +45,11 @@
     Billy @ CP
       -changed the way M1 works. Made it so it always happens at every tool change and the check box makes it happen between every tool path.
       -clamp codes defaulted to off
+
+    10 11/8/2022
+    Billy @ CP
+      -fixed safe retracts to work after the tool change for avoiding parts in machines like the 750
+
 
 
 */
@@ -2243,6 +2248,14 @@ function onSection() {
       "T" + toolFormat.format(tool.number),
       mFormat.format(6)
     );
+
+    if (!getProperty("safeStartAllOperations")) {
+      retracted = true;
+    } else {
+      retracted = false; // force retract after tool change if maximum Z retract is desired
+    }
+
+
     if (tool.comment) {
       writeComment(tool.comment);
     }
