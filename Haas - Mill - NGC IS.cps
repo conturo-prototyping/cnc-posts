@@ -1,7 +1,7 @@
 /**
   h-AAS post processor configuration.
 
-  $Revision: 10 $
+  $Revision: 12 $
   $Date: 2022-11-08 $
   
 
@@ -61,6 +61,13 @@
       -in process of adding a manual tool change option (testing by Joe)
       -power off at M30 disabled option at beginning of program
       -added settings categroy to post options for machine settings
+
+    12 11/8/2022
+    Billy @ CP
+      -changed up the manual tool change logic after reviewing with Joe 
+         -elimated the option to reduce confusion - commented out so future functionality is still there
+         -set gantry tool change postion based on Joes recommendation
+      -added power off timer set to 0, mostly to trigger an alarm on the gantry if it's not selected - kinda hack but will work for now
 
 
 */
@@ -200,6 +207,7 @@ properties = {
     value      : true,
     scope      : "post"
   },
+  /*
   manualTool: {
     title      : "Manual Tool Change",
     description: "Manual tool change Configuration to use for manual tool changes. Automatic uses machine selection for tool changer information. Other options specify control, ATC capacity, and tool number to be sacrificed for tool changes",
@@ -208,14 +216,15 @@ properties = {
     values     : [
       {title:"None", id:"none"},
       {title:"Automatic", id:"auto"},
-      {title:"Classic 10ATC #10", id:"PRE-10-10"},
-      {title:"Classic 10ATC #9", id:"PRE-10-9"},
-      {title:"Classic 10ATC #7", id:"PRE-10-7"},
-      {title:"NGC 24ATC #20", id:"NGC-10-9"}
+      //{title:"Classic 10ATC #10", id:"PRE-10-10"},
+      //{title:"Classic 10ATC #9", id:"PRE-10-9"},
+      //{title:"Classic 10ATC #7", id:"PRE-10-7"},
+      //{title:"NGC 24ATC #20", id:"NGC-10-9"}
     ],
     value      : "none",
     scope      : "post"
   },
+  */
   chipTransport: {
     title      : "Chip conveyor",
     description: "Chip conveyor or screw setting. Automatic runs the chip conveyor as needed for large roughing tools",
@@ -1236,7 +1245,10 @@ function onOpen() {
 
   // dump post properties  
   writeln("")
+    if(getProperty("machineModel") != "gr-408"){
   writeComment("Chip conveyor = " + getProperty("chipTransport"))
+  }
+
   if (getProperty("mistType") == "mom1"){
     writeComment("MOM Mist")
   }
@@ -1246,8 +1258,9 @@ function onOpen() {
   if (getProperty("mistType") == "mom3"){
     writeComment("Super MOM !!!!!")
   }
-  if(getProperty("manualTool") != "none"){
-  writeComment("Manual tool change mode on")
+  if(getProperty("machineModel") == "gr-408"){  //manual tool change mode comment
+  writeComment("Manual tool change mode on for GR-408 pre-NGC")
+  writeComment("pre-NGC manual tool changes require setting 15 to be turned off")
   }
 
   // dump tool information
@@ -1436,8 +1449,12 @@ function onOpen() {
   }
 
   //misc settings to write
-  if (getProperty("m30Power")){
-  writeBlock("G167 P2 Q0 K10755") //Power off at M30 disabled at the start of a program
+  if (getProperty("machineModel") != "gr-408"){
+    writeBlock("G167 P1 Q0 K10755") //Power off timer set to 0 - always on
+  }
+
+  if (getProperty("m30Power") && (getProperty("machineModel") != "gr-408")){
+    writeBlock("G167 P2 Q0 K10755") //Power off at M30 disabled at the start of a program
   }
 
 
@@ -2365,45 +2382,50 @@ function onSection() {
     }
 
 
-    //tool change section
+    //tool change section  -- disabled until we prove out the pre-ngc control more, this all works though
+    /*
     var toolSplitAtc = Number(getProperty("manualTool").match(/[0-9]+/));
     var toolSplitChange = Number(getProperty("manualTool").match(/[0-9]+$/));
     var toolControl = String(getProperty("manualTool").match(/[a-zA-Z]+/));
-    //writeln(toolControl);   used for debug
-    //writeln(toolSplitAtc);
-    //writeln(toolSplitChange);
+    */
 
-
+    //writeBlock("G167 P15 Q1 K10755"); //doesn't work on pre-ngc control -- setting 15 is the T-H mismatch check
 
     skipBlock = !insertToolCall;
     //manual tool change automatically set based on machine type
-    if(getProperty("manualTool") == "auto"){
+    //if(getProperty("manualTool") == "auto"){      //disabled manual tool change option
       if(getProperty("machineModel") == "gr-408"){
-      writeComment("preset manual tool change for gr-408"); //using tool 10 as the swap tool. Change this section to change that.
-      if(tool.number > 9){
+      writeComment("manual tool change for gr-408 pre-NGC using T10"); //using tool 10 as the swap tool. Change this section to change that.
+      if((tool.number > 9) && (tool.number != 10)){
         writeToolBlock(
           "T" + toolFormat.format(10),
-          mFormat.format(6))
-        //xyz location for tool change here <<<<<<<<<<<<
-        writeBlock("T" + toolFormat.format(tool.number))
+          mFormat.format(6));
+        writeBlock(gFormat.format(0), gFormat.format(53), "X" + xyzFormat.format(-50.), "Y" + xyzFormat.format(90.), "Z" + xyzFormat.format(4.5));
+        writeBlock("T" + toolFormat.format(tool.number));
         writeBlock(mFormat.format(00));
         writeComment("Switch to Hand Jog mode and remove current tool from spindle");
         writeComment("Insert tool " + tool.number + " into spindle");
         writeComment("Switch back to memory mode and press cycle start");
-        writeBlock("G167 P15 Q1 K10755");
+        
       }
       else{
-        writeBlock("G167 P15 Q0 K10755")
-        writeToolBlock(
+        //error if tool 10 is called -- reserved for manual tool changes only
+        if(tool.number == 10){
+          error(localize("Tool 10 pocket is used for manual tool changes only, use a different tool number"));
+        }
+        //normal tool change if tool number is less than 10
+        else{
+          writeToolBlock(
           "T" + toolFormat.format(tool.number),
           mFormat.format(6)
           )
+        }
       }
       }
-    }
+    //}
     else{
-      // Pre-NGC manual tool change set using custom values
-      if(toolControl == "PRE"){
+      // Pre-NGC manual tool change set using custom values -- not in use right now because options are commented out
+      /*if(toolControl == "PRE"){
     writeComment("manual tool change for Pre-NGC Haas control with ATC" + toolSplitAtc + " using tool number " + toolSplitChange);
     if((tool.number > toolSplitAtc) || (tool.number == toolSplitChange)){
       writeToolBlock(
@@ -2416,23 +2438,24 @@ function onSection() {
       writeComment("Switch to Hand Jog mode and remove current tool from spindle");
       writeComment("Insert tool " + tool.number + " into spindle");
       writeComment("Switch back to memory mode and press cycle start");
-      writeBlock("G167 P15 Q1 K10755");
+      //writeBlock("G167 P15 Q1 K10755"); //doesn't work on pre-ngc control :(
     }
     else{
-      writeBlock("G167 P15 Q0 K10755")
+      //writeBlock("G167 P15 Q0 K10755"); //doesn't work on classic control :(
       writeToolBlock(
         "T" + toolFormat.format(tool.number),
         mFormat.format(6)
         )
     }
       }
+      */
       //standard tool change if no manual tool change selected
-      else{
+      //else{
       writeToolBlock(
         "T" + toolFormat.format(tool.number),
         mFormat.format(6)
       )
-      }
+      //}
     }
     
     if (!getProperty("safeStartAllOperations")) {
