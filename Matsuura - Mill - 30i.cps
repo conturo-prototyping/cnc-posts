@@ -4,10 +4,18 @@
   
   Matsuura Fanuc 30i post processor
 
-  $Revision: 10  $
-  $Date: 2022-11-08 $
+  $Revision: 11  $
+  $Date: 2022-11-09 $
 
-  Matsuura Fanuc 30i post processor configuration
+     __  __     _     _____   ___   _   _   _   _   ___     _   
+    |  \/  |   /_\   |_   _| / __| | | | | | | | | | _ \   /_\  
+    | |\/| |  / _ \    | |   \__ \ | |_| | | |_| | |   /  / _ \ 
+    |_|  |_| /_/ \_\   |_|   |___/  \___/   \___/  |_|_\ /_/ \_\
+  
+    
+  Conturo Prototyping Version Info
+
+
   3 - 3/18/2022
   Billy @ CP 
     -changed the info for the post to match naming convention in fusion
@@ -44,10 +52,17 @@
     - added pallet swapping option includiing...
        - M30 to G65 P9901 with included shutdown for spindle and stuff
        - notification at beginning of program and end of program
+       ***sinjon made a dummy program 9999 to plug into the pallet manager for the pallet that's not being used, essentially 9999 calles the P9901 start program
 
   10 - 11/8/2022
   Billy @ CP
     - fixed M1 option stop
+  
+  11 - 11/9/2022
+    - added spindle an coolant restarts after option stops for each tool path -- this code is redundent is option stop is turned off on the control, that should be ok
+    - updated date and time logic
+    - write post processor info
+    - updated minimumRevision to origional -- this is the post engine
 
     */
 
@@ -56,7 +71,7 @@ vendor = "Matsuura";
 vendorUrl = "https://www.matsuura.co.jp/english/";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
-minimumRevision = 0 ;
+minimumRevision = 45793 ;
 
 longDescription = "Matsuura 30i post built from generic Fanuc post by Conturo Prototyping and NexGenCam";
 
@@ -289,6 +304,7 @@ propertyDefinitions = {
   
 };
 
+
 var singleLineCoolant = false; // specifies to output multiple coolant codes in one line rather than in separate lines
 // samples:
 // {id: COOLANT_THROUGH_TOOL, on: 88, off: 89}
@@ -508,7 +524,7 @@ function onOpen() {
       }
     }
     if ((programId >= 8000) && (programId <= 9999)) {
-      warning(localize("Program number is reserved by tool builder."));
+      error(localize("Program number is reserved by tool builder."));
     }
     oFormat = createFormat({width:(properties.o8 ? 8 : 4), zeropad:true, decimals:0});
     var jobdescription = (getGlobalParameter("job-description"))
@@ -523,6 +539,10 @@ function onOpen() {
     return;
   }
 
+  // write test version
+  writeComment("test version")
+
+
   // write user name	
   if (hasGlobalParameter("username")) {
     var usernameprint = getGlobalParameter("username");
@@ -531,16 +551,22 @@ function onOpen() {
 		  }
 		  
   // write date
+  var d = new Date();
 	if (hasGlobalParameter("generated-at")) {
     var datetime = getGlobalParameter("generated-at");
-		  writeComment("Program Posted: " + datetime + "UTC0");
-		  }
+		  writeComment("Program Posted: " + d.toLocaleDateString() + " " + (d.toLocaleTimeString()));
+  }
 
   // dump post properties  
+  if ((typeof getHeaderVersion == "function") && getHeaderVersion()) { 
+    writeComment(("Matsuura Fanuc 30i Post V") + getHeaderVersion()); 
+  }
+  writeln("")
   writeComment("Chip management=" + properties.chipTransport)
   if(properties.isPalletProgram){
     writeComment("Auto pallet changing enabled")
   }
+
 
 
   // dump machine configuration
@@ -569,6 +595,7 @@ function onOpen() {
   // dump tool information
   if (properties.writeTools) {
     var zRanges = {};
+    writeln("")
     if (is3D()) {
       var numberOfSections = getNumberOfSections();
       for (var i = 0; i < numberOfSections; ++i) {
@@ -1413,7 +1440,7 @@ function onSection() {
     }
   }
   
-  //optional stop at the beginning of every tool path
+  //optional stop at the beginning of every tool path -- on Matsuura this requires spindle and coolant to be turned back on in the program
   if (!isFirstSection() && properties.optionalStop) {  
     onCommand(COMMAND_OPTIONAL_STOP);
   }
@@ -1477,18 +1504,21 @@ function onSection() {
 
   if (!isProbeOperation() &&
       !isInspectionOperation(currentSection) &&
-      (insertToolCall ||
-       forceSpindleSpeed ||
-       isFirstSection() ||
-       (rpmFormat.areDifferent(spindleSpeed, sOutput.getCurrent())) ||
-       (tool.clockwise != getPreviousSection().getTool().clockwise))) {
+      (insertToolCall || 
+        forceSpindleSpeed || 
+        properties.optionalStop || 
+        isFirstSection() || 
+        (rpmFormat.areDifferent(spindleSpeed, sOutput.getCurrent())) || 
+        (tool.clockwise != getPreviousSection().getTool().clockwise)
+      )
+      ) {
     forceSpindleSpeed = false;
     
     if (spindleSpeed < 1) {
       error(localize("Spindle speed out of range."));
       return;
     }
-    if (spindleSpeed > 99999) {
+    if (spindleSpeed > 15000) {
       warning(localize("Spindle speed exceeds maximum value."));
     }
     var tapping = hasParameter("operation:cycleType") &&
@@ -1573,8 +1603,15 @@ function onSection() {
     setProbingAngle();
   }
 
-  // set coolant after we have positioned at Z
+  // set coolant to off for optional stop at the beginning of every tool path
+  if (!isFirstSection() && properties.optionalStop) {      
+    currentCoolantMode = COOLANT_OFF;
+  }
+
+  // set coolant after we have positioned at Z  
   setCoolant(tool.coolant);
+  
+  
 
   /** // start coolant flush
   if (tool.type != TOOL_PROBE) {
@@ -3042,13 +3079,13 @@ function onClose() {
   //onImpliedCommand(COMMAND_STOP_SPINDLE);
   
   if(properties.isPalletProgram){
-    writeBlock(mFormat.format(01)); // optional stop
-    writeBlock(mFormat.format(05)); // stop spindle
+    writeBlock(mFormat.format(1)); // optional stop
+    writeBlock(mFormat.format(5)); // stop spindle
     writeBlock(gFormat.format(65) + " P9901"); // return to start program
     writeComment("Returning to main program 9901");
   }
   else{
-    writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
+    writeBlock(mFormat.format(30)); // stop program, spindle stop
   }
   if (subprograms.length > 0) {
     writeln("");
