@@ -1,10 +1,18 @@
 /**
-  h-AAS post processor configuration.
+ * 
+ * 
+ 
+  HAAS NGC Inspect Surface post processor
 
-  $Revision: 12 $
-  $Date: 2022-11-08 $
-  
+  $Revision: 14 $
+  $Date: 2022-11-09 $ 
 
+  o  o   O    O   o-o        O  o   o o-O-o  o-o  o   o   O  o-O-o o-O-o  o-o  o   o 
+  |  |  / \  / \ |          / \ |   |   |   o   o |\ /|  / \   |     |   o   o |\  | 
+  O--O o---oo---o o-o      o---o|   |   |   |   | | O | o---o  |     |   |   | | \ | 
+  |  | |   ||   |    |     |   ||   |   |   o   o |   | |   |  |     |   o   o |  \| 
+  o  o o   oo   oo--o      o   o o-o    o    o-o  o   o o   o  o   o-O-o  o-o  o   o 
+ 
     Conturo Prototyping Version Info
     
     03/10/2022
@@ -69,6 +77,18 @@
          -set gantry tool change postion based on Joes recommendation
       -added power off timer set to 0, mostly to trigger an alarm on the gantry if it's not selected - kinda hack but will work for now
 
+    13 11/9/2022
+    Billy @ CP
+       -updated minimumRevision to origional -- this is the post engine
+       -added test version comment section
+       -updated date and time logic
+       -write post processor info
+       -modifiec long description to including pre-ngc control aka GR-408 -- should work with others
+    
+    14 11/10/2022
+    Billy @ CP
+       -fixed tool preload -- had this setup for manual tool changes and parameter doesn't exist anymore, GR-408 no tool preloads
+
 
 */
 
@@ -94,11 +114,7 @@ vendor = "HAAS Automation";
 vendorUrl = "https://www.haascnc.com/index.html";
 legal = "Conturo Prototyping";
 certificationLevel = 2;
-//minimumRevision = "00000";
-
-//longDescription = "Generic post for the HAAS Next Generation control. The post includes support for multi-axis indexing and simultaneous machining. The post utilizes the dynamic work offset feature so you can place your work piece as desired without having to repost your NC programs." + EOL +
-//"You can specify following pre-configured machines by using the property 'Machine model':" + EOL +
-//"UMC-500" + EOL + "UMC-750" + EOL + "UMC-1000" + EOL + "UMC-1600-H";
+minimumRevision = "45793";
 
 extension = "nc";
 programNameIsInteger = true;
@@ -1212,6 +1228,9 @@ function onOpen() {
     }
   }
 
+    // write test version
+  writeComment("test version")
+
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
   var model = machineConfiguration.getModel();
@@ -1238,12 +1257,17 @@ function onOpen() {
 		  }
 		  
   // write date
+  var d = new Date();
 	if (hasGlobalParameter("generated-at")) {
     var datetime = getGlobalParameter("generated-at");
-		  writeComment("Program Posted: " + datetime + "UTC0");
-		  }  
+		  writeComment("Program Posted: " + d.toLocaleDateString() + " " + (d.toLocaleTimeString()));
+  }
 
   // dump post properties  
+  writeln("")
+  if ((typeof getHeaderVersion == "function") && getHeaderVersion()) { 
+    writeComment(("Haas Mill NGC IS  Post V") + getHeaderVersion()); 
+  }  
   writeln("")
     if(getProperty("machineModel") != "gr-408"){
   writeComment("Chip conveyor = " + getProperty("chipTransport"))
@@ -2402,7 +2426,7 @@ function onSection() {
           mFormat.format(6));
         writeBlock(gFormat.format(0), gFormat.format(53), "X" + xyzFormat.format(-50.), "Y" + xyzFormat.format(90.), "Z" + xyzFormat.format(4.5));
         writeBlock("T" + toolFormat.format(tool.number));
-        writeBlock(mFormat.format(00));
+        writeBlock(mFormat.format(0));
         writeComment("Switch to Hand Jog mode and remove current tool from spindle");
         writeComment("Insert tool " + tool.number + " into spindle");
         writeComment("Switch back to memory mode and press cycle start");
@@ -2733,7 +2757,8 @@ function onSection() {
   gMotionModal.reset();
   validate(lengthCompensationActive, "Length compensation is not active.");
 
-  if(getProperty("manualTool") == "none"){
+  //if(getProperty("manualTool") == "none"){  //turned off until we roll out a more thorough manual tool change setup
+  if(getProperty("machineModel") != "gr-408"){ //no tool preload on gr-408 becaue of umbrella changer
   //preload tools
     if (insertToolCall || operationNeedsSafeStart) {
       if (getProperty("preloadTool")) {
@@ -2753,6 +2778,7 @@ function onSection() {
         }
       }
     }
+  //}
   }
 
   if (isProbeOperation()) {
@@ -4528,7 +4554,7 @@ function setProperty(property, value) {
 
 capabilities |= CAPABILITY_INSPECTION;
 description = "CP - HAAS - Mill - NGC";
-longDescription = "Generic post modified and managed by Conturo Prototyping for HAAS NGC with inspect surface. Built from Fusion V43573. See forum thread https://forum.shopq.io/t/post-haas-ngc-inspect-surface/92 for feature requests and complaints." ;
+longDescription = "Generic post modified and managed by Conturo Prototyping for HAAS NGC with inspect surface. Built from Fusion V43573. See forum thread https://forum.shopq.io/t/post-haas-ngc-inspect-surface/92 for feature requests and complaints. This post will also work with some Pre-NGC controls including the GR-408" ;
 
 
 var controlType = "NGC"; // Specifies the control model "NGC" or "Classic"
