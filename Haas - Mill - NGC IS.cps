@@ -4,7 +4,7 @@
  
   HAAS NGC Inspect Surface post processor
 
-  $Revision: 16 $
+  $Revision: 17 $
   $Date: 2022-12-07 $ 
 
   o  o   O    O   o-o        O  o   o o-O-o  o-o  o   o   O  o-O-o o-O-o  o-o  o   o 
@@ -97,6 +97,9 @@
     Billy @ CP
        -updated MOM system amount and intervals per discussion with joe
        -corrected MOM off to M103 per Joe
+    
+    17 12/7/2022
+       -updated Y axis retract to -90.0 on GR408
 
 
 */
@@ -2440,7 +2443,7 @@ function onSection() {
         writeToolBlock(
           "T" + toolFormat.format(10),
           mFormat.format(6));
-        writeBlock(gFormat.format(0), gFormat.format(53), "X" + xyzFormat.format(-50.), "Y" + xyzFormat.format(90.), "Z" + xyzFormat.format(4.5));
+        writeBlock(gFormat.format(0), gFormat.format(53), "X" + xyzFormat.format(-50.), "Y" + xyzFormat.format(-90.), "Z" + xyzFormat.format(4.5));
         writeBlock("T" + toolFormat.format(tool.number));
         writeBlock(mFormat.format(0));
         writeComment("Switch to Hand Jog mode and remove current tool from spindle");
