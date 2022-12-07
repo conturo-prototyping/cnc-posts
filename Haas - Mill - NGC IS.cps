@@ -4,8 +4,8 @@
  
   HAAS NGC Inspect Surface post processor
 
-  $Revision: 14 $
-  $Date: 2022-11-09 $ 
+  $Revision: 16 $
+  $Date: 2022-12-07 $ 
 
   o  o   O    O   o-o        O  o   o o-O-o  o-o  o   o   O  o-O-o o-O-o  o-o  o   o 
   |  |  / \  / \ |          / \ |   |   |   o   o |\ /|  / \   |     |   o   o |\  | 
@@ -88,6 +88,15 @@
     14 11/10/2022
     Billy @ CP
        -fixed tool preload -- had this setup for manual tool changes and parameter doesn't exist anymore, GR-408 no tool preloads
+    
+    15 11/18/2022
+    Billy @ CP
+       -Made G167 a checkbox because it doesn't work on all machines
+    
+    16 12/7/2022
+    Billy @ CP
+       -updated MOM system amount and intervals per discussion with joe
+       -corrected MOM off to M103 per Joe
 
 
 */
@@ -254,6 +263,14 @@ properties = {
     value: "auto",
     scope: "post"
   },
+  G167: {
+    title      : "Allow G167",
+    description: "Use G167 to overwrite settings for standardization. This doesn't work on some NGC and Pre-NGC control versions",
+    group      : "Settings",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
   mistType: {
     title      : "Tool mist type",
     description: "Select the type of tool mist being used",
@@ -261,8 +278,8 @@ properties = {
     type       : "enum",
     values     : [
       {title:"MQL", id:"mql"},
-      {title:"MOM", id:"mom1"},
-      {title:"HIGH MOM", id:"mom2"},
+      {title:"LIL' MOM", id:"mom1"},
+      {title:"MOM", id:"mom2"},
       {title:"SUPER MOM", id:"mom3"}
     ],
     value      : "mql",
@@ -705,12 +722,12 @@ var singleLineCoolant = false; // specifies to output multiple coolant codes in 
   var coolants = 
   [
   {id:COOLANT_FLOOD, on:8},
-  //{id:COOLANT_MIST, on:102, off:104}, //testing
+  //{id:COOLANT_MIST, on:102, off:104}, //moved to other section for mist
   {id:COOLANT_THROUGH_TOOL, on:88, off:89},
   {id:COOLANT_AIR, on:83, off:84},
   {id:COOLANT_AIR_THROUGH_TOOL, on:73, off:74},
   {id:COOLANT_SUCTION},
-  {id:COOLANT_FLOOD_MIST, on:150, off:151}, //testing
+  {id:COOLANT_FLOOD_MIST, on:150, off:151}, //untested to run mist and coolant together
   {id:COOLANT_FLOOD_THROUGH_TOOL, on:[88, 8], off:[89, 9]},
   {id:COOLANT_OFF, off:9} 
   ];   
@@ -1213,12 +1230,6 @@ function onOpen() {
     return;
   }
 
-  if (getProperty("useG0")) {
-    writeComment(localize("Using G0 which travels along dogleg path."));
-  } else {
-    writeComment(subst(localize("Using high feed G1 F%1 instead of G0."), feedFormat.format(highFeedrate)));
-  }
-
   if (getProperty("writeVersion")) {
     if ((typeof getHeaderVersion == "function") && getHeaderVersion()) {
       writeComment(localize("post version") + ": " + getHeaderVersion());
@@ -1269,7 +1280,12 @@ function onOpen() {
     writeComment(("Haas Mill NGC IS  Post V") + getHeaderVersion()); 
   }  
   writeln("")
-    if(getProperty("machineModel") != "gr-408"){
+  if (getProperty("useG0")) {
+    writeComment(localize("Using G0 which travels along dogleg path."));
+  } else {
+    writeComment(subst(localize("Using high feed G1 F%1 instead of G0."), feedFormat.format(highFeedrate)));
+  }
+  if(getProperty("machineModel") != "gr-408"){
   writeComment("Chip conveyor = " + getProperty("chipTransport"))
   }
 
@@ -1467,17 +1483,17 @@ function onOpen() {
   coolantPressure = getProperty("coolantPressure");
 
   //chip screws/conveyor auto operation settings
-  if ((getProperty("chipTransport") == "auto")  && (getProperty("machineModel") != "gr-408") && (getProperty("setChip"))){
+  if ((getProperty("chipTransport") == "auto")  && (getProperty("machineModel") != "gr-408") && (getProperty("setChip")) && (getProperty("G167"))){
     writeBlock("G167 P114 Q6 K10755") //change setting 114 to 6 min (total cycle time)
     writeBlock("G167 P115 Q5 K10755") //change setting 113 to 5 min (on time)
   }
 
   //misc settings to write
-  if (getProperty("machineModel") != "gr-408"){
+  if ((getProperty("machineModel") != "gr-408") && (getProperty("G167"))){
     writeBlock("G167 P1 Q0 K10755") //Power off timer set to 0 - always on
   }
 
-  if (getProperty("m30Power") && (getProperty("machineModel") != "gr-408")){
+  if (getProperty("m30Power") && (getProperty("machineModel") != "gr-408") && (getProperty("G167"))){
     writeBlock("G167 P2 Q0 K10755") //Power off at M30 disabled at the start of a program
   }
 
@@ -4039,14 +4055,14 @@ var isSpecialCoolantActive = false;
 
 function getCoolantCodes(coolant) {
 
-  if (getProperty("mistType") == "mom1"){
-    coolants.push({id:COOLANT_MIST, on:["M102 I.078 J3.",83], off:[104,84]});
+  if (getProperty("mistType") == "mom1"){  //MOM low
+    coolants.push({id:COOLANT_MIST, on:["M102 I.05 J6.",83], off:[103,84]});
   }
-  if (getProperty("mistType") == "mom2"){
-    coolants.push({id:COOLANT_MIST, on:["M102 I.2 J3.",83], off:[104,84]});
+  if (getProperty("mistType") == "mom2"){  //MOM medium
+    coolants.push({id:COOLANT_MIST, on:["M102 I.08 J5.",83], off:[103,84]});
   }
-  if (getProperty("mistType") == "mom3"){
-    coolants.push({id:COOLANT_MIST, on:["M102 I.3 J3.",83], off:[104,84]});
+  if (getProperty("mistType") == "mom3"){  //MOM high
+    coolants.push({id:COOLANT_MIST, on:["M102 I.09 J4.",83], off:[103,84]});
   }
   else{
   coolants.push({id:COOLANT_MIST, on:140, off:142}); //MQL default mist
