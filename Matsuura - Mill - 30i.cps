@@ -4,22 +4,85 @@
 
   FANUC post processor configuration.
 
-  $Revision: 44013 15bbcf7973d643e20fc10210417bd85668e7c0ea $
-  $Date: 2022-10-27 20:22:54 $
+  $Revision: 12 $
+  $Date: 2022-10-27 $
 
-  FORKID {6A0C1F5D-1F55-4900-A38E-4C7292F5FD89}
+
+
+     __  __     _     _____   ___   _   _   _   _   ___     _   
+    |  \/  |   /_\   |_   _| / __| | | | | | | | | | _ \   /_\  
+    | |\/| |  / _ \    | |   \__ \ | |_| | | |_| | |   /  / _ \ 
+    |_|  |_| /_/ \_\   |_|   |___/  \___/   \___/  |_|_\ /_/ \_\
+  
+    
+  Conturo Prototyping Version Info
+
+
+  3 - 3/18/2022
+  Billy @ CP 
+    -changed the info for the post to match naming convention in fusion
+    -reloaded everything into gethub
+    -checked .nc file  extention was removed
+    
+  4 - 3/24/2022
+  Billy @ CP
+    -added "CP" to description per Patricks request
+
+  5 - 3/25/2022
+  Billy @ CP
+    - added "mill" to discription
+  
+  6 - 8/1/2022
+  Billy @ CP
+    - added chip management logic, flush and chip conveyor on the same M code. refered to as "chiptransport" or "Chip Management" for all operatoins
+    - username added to top of program
+    - date added to top of program
+    - job description is now what feeds the program name, same as our other posts
+    - dump post properties at the top of the program
+    - added groups and formating to post properties
+
+  7 - 9/8/2022
+  Billy @ CP
+    - moved the B axis limit from 110 to 112.5
+
+  8 - 10/4/2022
+  Billy @ CP
+    - changed the way M1 works. Made it so it always happens at every tool change and the check box makes it happen between every tool path.
+
+  9 - 11/8/2022
+  Billy @ CP
+    - added pallet swapping option includiing...
+       - M30 to G65 P9901 with included shutdown for spindle and stuff
+       - notification at beginning of program and end of program
+       ***sinjon made a dummy program 9999 to plug into the pallet manager for the pallet that's not being used, essentially 9999 calles the P9901 start program
+
+  10 - 11/8/2022
+  Billy @ CP
+    - fixed M1 option stop
+  
+  11 - 11/9/2022
+    - added spindle an coolant restarts after option stops for each tool path -- this code is redundent is option stop is turned off on the control, that should be ok
+    - updated date and time logic
+    - write post processor info
+    - updated minimumRevision to origional -- this is the post engine
+
+  12 - 12/8/2022
+  Billy @ CP
+    - ported Matsuura 5 axis post from fusion library V 44013
+    - customized smoothing options using IPC R values, our machines might have MIMS P M F values but untested
+
 */
 
-description = "Matsuura";
+description = "CP - Matsuura - Mill - Fanuc 30i";
 vendor = "Matsuura";
-vendorUrl = "http://www.matsuura.co.jp";
-legal = "Copyright (C) 2012-2022 by Autodesk, Inc.";
+vendorUrl = "https://www.matsuura.co.jp/english/";
+legal = "Conturo Prototyping";
 certificationLevel = 2;
 minimumRevision = 45821;
 
-longDescription = "5-axis base post for Matsuura Mills with a FANUC control.";
+longDescription = "Matsuura 30i post built from generic Matsuura post by Conturo Prototyping";
 
-extension = "nc";
+extension = "";
 programNameIsInteger = true;
 setCodePage("ascii");
 
@@ -93,7 +156,7 @@ properties = {
   },
   optionalStop: {
     title      : "Optional stop",
-    description: "Outputs optional stop code during when necessary in the code.",
+    description: "Specifies that optional stops M1 should be output the biginning of every tool path. M1 will always be output at every tool change.",
     group      : "preferences",
     type       : "boolean",
     value      : true,
@@ -155,6 +218,7 @@ properties = {
     value      : false,
     scope      : "post"
   },
+  /* disabled because it should always be on
   useSmoothing: {
     title      : "Use smoothing",
     description: "Specifies if smoothing should be used or not.",
@@ -168,6 +232,19 @@ properties = {
       {title:"Finish", id:"3"}
     ],
     value: "9999",
+    scope: ["post",//"operation"]
+  },
+  */
+  typeSmoothing: {
+    title      : "Matsuura smothing type",
+    description: "Specifies the type of smoothing to use.",
+    group      : "preferences",
+    type       : "enum",
+    values     : [
+      {title:"IPC", id:"IPC"},
+      {title:"MIMS", id:"MIMS"} //MIMS untested
+    ],
+    value: "IPC",
     scope: ["post"/*,"operation"*/]
   },
   usePitchForTapping: {
@@ -230,11 +307,11 @@ properties = {
     group      : "homePositions",
     type       : "enum",
     values     : [
-      {title:"G28", id:"G28"},
+      {title:"G28", id:"G28"}, //default for Nara and Saga
       {title:"G53", id:"G53"}
       // {title: "Clearance Height", id: "clearanceHeight"}
     ],
-    value: "G53",
+    value: "G28",
     scope: "post"
   },
   useRigidTapping: {
@@ -266,18 +343,28 @@ properties = {
     value      : true,
     scope      : ["post"/*,"machine"*/]
   },
+  isPalletProgram: {
+    title      : "Automatic pallet changing",
+    description: "Set program for automatic pallet changing from a master program.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
+  /*
   rotaryAxesClampCodes: {
     title      : "Rotary axes clamp codes",
     description: "Specifies the clamp codes for the rotary axes.",
     group      : "multiAxis",
     type       : "enum",
     values     : [
-      {title:"M131/M132", id:"1"},
+      //{title:"M131/M132", id:"1"}, not used on Saga or Nara
       {title:"M21/M22", id:"2"},
     ],
-    value: "1",
+    value: "2",
     scope: "post"
   },
+  */
   singleResultsFile: {
     title      : "Create single results file",
     description: "Set to false if you want to store the measurement results for each probe / inspection toolpath in a separate file.",
@@ -296,6 +383,19 @@ properties = {
       {title:"PQI", id:"pqi"},
     ],
     value: "renishaw",
+    scope: "post"
+  },
+  chipTransport: {
+    title      : "Chip management",
+    description: "Enable to turn on chip transport at start of program.",
+    group      : "preferences",
+    type       : "enum",
+    values     : [
+      //{title:"Always On", id:"on"},
+      {title:"Automatic", id:"auto"},
+      {title:"Passthru Only", id:"pass"}
+    ],
+    value: "auto",
     scope: "post"
   }
 };
@@ -593,10 +693,10 @@ function getBodyLength(tool) {
 }
 
 function defineMachine() {
-  if (false) { // note: setup your machine here
-    var aAxis = createAxis({coordinate:0, table:true, axis:[1, 0, 0], range:[-120, 120], preference:1, tcp:true});
-    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360, 360], preference:0, tcp:true});
-    machineConfiguration = new MachineConfiguration(aAxis, cAxis);
+  if (true) { // note: setup your machine here
+    var bAxis = createAxis({coordinate:1, table:true, axis:[0, 1, 0], range:[-112.5,112.5], preference:-1, tcp:true});
+    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360,0], preference:0, tcp:true});
+    machineConfiguration = new MachineConfiguration(bAxis, cAxis);
 
     setMachineConfiguration(machineConfiguration);
     if (receivedMachineConfiguration) {
@@ -674,6 +774,34 @@ function onOpen() {
     return;
   }
 
+  // write test version
+  writeComment("test version")
+
+
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date
+  var d = new Date();
+	if (hasGlobalParameter("generated-at")) {
+    var datetime = getGlobalParameter("generated-at");
+		  writeComment("Program Posted: " + d.toLocaleDateString() + " " + (d.toLocaleTimeString()));
+  }
+
+  // dump post properties  
+  if ((typeof getHeaderVersion == "function") && getHeaderVersion()) { 
+    writeComment(("Matsuura Fanuc 30i Post V") + getHeaderVersion()); 
+  }
+  writeln("")
+  writeComment("Chip management=" + getProperty("chipTransport"))
+  if(getProperty("isPalletProgram")){
+    writeComment("Auto pallet changing enabled")
+  }
+
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
   var model = machineConfiguration.getModel();
@@ -700,6 +828,7 @@ function onOpen() {
   // dump tool information
   if (getProperty("writeTools")) {
     var zRanges = {};
+    writeln("");
     if (is3D()) {
       var numberOfSections = getNumberOfSections();
       for (var i = 0; i < numberOfSections; ++i) {
@@ -790,6 +919,7 @@ function onOpen() {
     feedFormat = createFormat({decimals:(unit == MM ? 4 : 5), forceDecimal:true});
     feedOutput = createVariable({prefix:"F"}, feedFormat);
   }
+  writeBlock(gFormat.format(130));
 }
 
 function onComment(message) {
@@ -840,13 +970,23 @@ function disableLengthCompensation(force) {
 // Start of smoothing logic
 var smoothingSettings = {
   roughing          : 1, // roughing level for smoothing in automatic mode
-  semi              : 2, // semi-roughing level for smoothing in automatic mode
-  finishing         : 3, // finishing level for smoothing in automatic mode
+  semi              : 5, // semi-roughing level for smoothing in automatic mode
+  finishing         : 8, // finishing level for smoothing in automatic mode
   thresholdRoughing : toPreciseUnit(0.01, IN), // operations with stock/tolerance above that threshold will use roughing level in automatic mode
   thresholdFinishing: toPreciseUnit(0.005, IN), // operations with stock/tolerance below that threshold will use finishing level in automatic mode
   differenceCriteria: "level", // options: "level", "tolerance", "both". Specifies criteria when output smoothing codes
-  autoLevelCriteria : "stock", // use "stock" or "tolerance" to determine levels in automatic mode
-  cancelCompensation: true // tool length compensation must be canceled prior to changing the smoothing level
+  autoLevelCriteria : "tolerance", // use "stock" or "tolerance" to determine levels in automatic mode
+  cancelCompensation: true, // tool length compensation must be canceled prior to changing the smoothing level
+  r1                : 1,
+  r2                : 2,
+  r3                : 3,
+  r4                : 4,
+  r5                : 5,
+  r6                : 6,
+  r7                : 7,
+  r8                : 8,
+  r9                : 9,
+  r10               : 10
 };
 
 // collected state below, do not edit
@@ -856,20 +996,29 @@ var smoothing = {
   isAllowed  : false, // smoothing is allowed for this operation
   isDifferent: false, // tells if smoothing levels/tolerances/both are different between operations
   level      : -1, // the active level of smoothing
-  tolerance  : -1, // the current operation tolerance
+  tolerance  : -1, // the current operation tolerance --default tolerance
   force      : false, // smoothing needs to be forced out in this operation
-  prefix     : "M"
+  prefix     : "R", // smoothing parameter prefix - changed to R from M
+  type       : "IPC", // Type of smoothing IPC or MIMS - see matsuura documents regarding this
+  filter     : -1,
+  correction : -1 //used to bump the smoothing up or down a level if fusion smoothing is used
 };
 
 function initializeSmoothing() {
   var previousLevel = smoothing.level;
   var previousTolerance = smoothing.tolerance;
   var previousPrefix = smoothing.prefix;
+  //var smoothingfilter = smoothing.filter;
+  //var smoothingmultiplyer = smoothing.multiplyer;
+  //var accelunit = smoothing.correction;
 
   // determine new smoothing levels and tolerances
-  smoothing.level = parseInt(getProperty("useSmoothing"), 10);
+  smoothing.level = 9999; //parseInt(getProperty("useSmoothing"), 10);
   smoothing.level = isNaN(smoothing.level) ? -1 : smoothing.level;
   smoothing.tolerance = Math.max(getParameter("operation:tolerance", 0), 0);
+  smoothing.type = getProperty("typeSmoothing"); //Matsuura smoothing type
+  smoothing.filter = Math.max(getParameter("operation:smoothingFilterTolerance", 0), 0);
+  smoothing.correction = 0
 
   // automatically determine smoothing level
   if (smoothing.level == 9999) {
@@ -886,17 +1035,73 @@ function initializeSmoothing() {
         }
       }
     } else { // detemine auto smoothing level based on operation tolerance instead of stockToLeave
-      smoothing.level = smoothing.tolerance < smoothingSettings.thresholdRoughing ? smoothing.tolerance > smoothingSettings.thresholdFinishing ?
-        smoothingSettings.semi : smoothingSettings.finishing : smoothingSettings.roughing;
+      //smoothing.level = smoothing.tolerance < smoothingSettings.thresholdRoughing ? smoothing.tolerance > smoothingSettings.thresholdFinishing ?
+        //smoothingSettings.semi : smoothingSettings.finishing : smoothingSettings.roughing;
+
+      const y = smoothing.filter 
+      switch(true){
+      case (y <= 0.0014):
+        smoothing.correction = 0;
+        break;
+      case (y < 0.210):
+        smoothing.correction = -1;
+        break;
+      default:
+        error(localize("Smoothing tolerance out of range."));
+        return;
+      }  
+
+
+      const x = smoothing.tolerance  
+      switch(true){
+      case (x < 0.0003):
+        smoothing.level = smoothingSettings.r10 + smoothing.correction;
+        break;
+      case (x < 0.0005):
+        smoothing.level = smoothingSettings.r9 + smoothing.correction;
+        break;
+      case (x < 0.0007):
+        smoothing.level = smoothingSettings.r8 + smoothing.correction;
+        break;
+      case (x < 0.0030):
+        smoothing.level = smoothingSettings.r7 + smoothing.correction;
+        break;
+      case (x < 0.0050):
+        smoothing.level = smoothingSettings.r6 + smoothing.correction;
+        break;
+      case (x < 0.0090):
+        smoothing.level = smoothingSettings.r5 + smoothing.correction;
+        break;
+      case (x < 0.0120):
+        smoothing.level = smoothingSettings.r4 + smoothing.correction;
+        break;
+      case (x < 0.0500):
+        smoothing.level = smoothingSettings.r3 + smoothing.correction;
+        break;
+      case (x < 0.0900):
+        smoothing.level = smoothingSettings.r2 + smoothing.correction;
+        break;
+      case (x < 0.210):
+        smoothing.level = smoothingSettings.r1;
+        break;
+      default:
+        error(localize("Tolerance out of range."));
+        return;
+      }
     }
   }
-
-  if (currentSection.checkGroup(STRATEGY_MULTIAXIS)) {
+  //smoothing prefix based on type
+  if(smoothing.type == "MIMS"){
+    if (currentSection.checkGroup(STRATEGY_MULTIAXIS)) {
     smoothing.prefix = "F";
-  } else if (currentSection.checkGroup(STRATEGY_2D)) {
+    } else if (currentSection.checkGroup(STRATEGY_2D)) {
     smoothing.prefix = "P";
-  } else {
+    } else {
     smoothing.prefix = "M";
+    }
+  }
+  else{
+    smoothing.prefix = "R"
   }
 
   if (smoothing.level == -1) { // useSmoothing is disabled
@@ -931,6 +1136,7 @@ function initializeSmoothing() {
 }
 
 function setSmoothing(mode) {
+
   if (mode == smoothing.isActive && (!mode || !smoothing.isDifferent) && !smoothing.force) {
     return; // return if smoothing is already active or is not different
   }
@@ -939,9 +1145,16 @@ function setSmoothing(mode) {
   }
 
   if (mode) { // enable smoothing
+    if (hasParameter("operation:smoothingFilterTolerance") && (smoothing.filter > 0)) {
+      writeComment("Smoothing: " + ijkFormat.format(getParameter("operation:smoothingFilterTolerance", 0))) //write smoothing filter
+    };
+    if (hasParameter("operation:tolerance")) {
+      writeComment("Tolerance: "+ (getParameter("operation:tolerance", 0))) //write tolerance
+    };
     writeBlock(gFormat.format(131), smoothing.prefix + smoothing.level);
   } else { // disable smoothing
     writeBlock(gFormat.format(130));
+    
   }
   smoothing.isActive = mode;
   smoothing.force = false;
@@ -1602,13 +1815,23 @@ function onSection() {
     }
   }
 
+  //optional stop at the beginning of every tool path -- on Matsuura this requires spindle and coolant to be turned back on in the program
+  if (!isFirstSection() && getProperty("optionalStop")) {  
+    onCommand(COMMAND_OPTIONAL_STOP);
+  }
+
   if (insertToolCall || operationNeedsSafeStart) {
 
     if (!isFirstSection() && insertToolCall) {
       forceWorkPlane();
       onCommand(COMMAND_COOLANT_OFF);
     }
-    if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
+    if (getProperty("chipTransport") == "auto" || "pass") {
+      if (!isFirstSection() && insertToolCall) {
+        onCommand(COMMAND_STOP_CHIP_TRANSPORT);
+      }
+    }
+    if (!isFirstSection() && !getProperty("optionalStop") && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
 
@@ -1662,13 +1885,13 @@ function onSection() {
       forceSpindleSpeed || isFirstSection() ||
       (rpmFormat.areDifferent(spindleSpeed, sOutput.getCurrent())) ||
       (tool.clockwise != getPreviousSection().getTool().clockwise));
-    if (spindleChanged || operationNeedsSafeStart) {
+    if (spindleChanged || operationNeedsSafeStart || getProperty("optionalStop")) {
       forceSpindleSpeed = false;
       if (spindleSpeed < 1) {
         error(localize("Spindle speed out of range."));
         return;
       }
-      if (spindleSpeed > 99999) {
+      if (spindleSpeed > 15000) {
         warning(localize("Spindle speed exceeds maximum value."));
       }
       var tapping = hasParameter("operation:cycleType") &&
@@ -1682,7 +1905,9 @@ function onSection() {
           sOutput.format(spindleSpeed), mFormat.format(tool.clockwise ? 3 : 4)
         );
       }
-      onCommand(COMMAND_START_CHIP_TRANSPORT);
+
+      //onCommand(COMMAND_START_CHIP_TRANSPORT);
+
       if (forceMultiAxisIndexing || !is3D() || machineConfiguration.isMultiAxisConfiguration()) {
       // writeBlock(mFormat.format(xxx)); // shortest path traverse
       }
@@ -1714,6 +1939,16 @@ function onSection() {
 
   // set coolant after we have positioned at Z
   setCoolant(tool.coolant);
+
+  if (tool.type != TOOL_PROBE) {
+    if(getProperty("chipTransport") == "auto"){      
+      if(tool.diameter >= .34){
+        onCommand(COMMAND_START_CHIP_TRANSPORT) //chip management commands flush start and conveyor start
+      }
+    }
+  }
+  
+
 
   setSmoothing(smoothing.isAllowed);
   forceAny();
@@ -1750,7 +1985,7 @@ function onSection() {
         gMotionModal.format(0),
         gFormat.format(getOffsetCode()),
         zOutput.format(initialPosition.z),
-        hFormat.format(lengthOffset)
+        "H#517"
       );
       lengthCompensationActive = true;
     } else {
@@ -1765,7 +2000,7 @@ function onSection() {
           gMotionModal.format(0),
           gFormat.format(getOffsetCode()),
           zOutput.format(initialPosition.z),
-          hFormat.format(lengthOffset)
+          "H#517"
         );
         lengthCompensationActive = true;
       } else {
@@ -1776,7 +2011,7 @@ function onSection() {
           gFormat.format(getOffsetCode()),
           xOutput.format(initialPosition.x),
           yOutput.format(initialPosition.y),
-          zOutput.format(initialPosition.z), hFormat.format(lengthOffset)
+          zOutput.format(initialPosition.z), "H#517"
         );
         lengthCompensationActive = true;
       }
@@ -2716,11 +2951,11 @@ function onLinear(_x, _y, _z, feed) {
       switch (radiusCompensation) {
       case RADIUS_COMPENSATION_LEFT:
         dOutput.reset();
-        writeBlock(gMotionModal.format(1), gFormat.format(41), x, y, z, dOutput.format(d), f);
+        writeBlock(gMotionModal.format(1), gFormat.format(41), x, y, z, "D#517", f);
         break;
       case RADIUS_COMPENSATION_RIGHT:
         dOutput.reset();
-        writeBlock(gMotionModal.format(1), gFormat.format(42), x, y, z, dOutput.format(d), f);
+        writeBlock(gMotionModal.format(1), gFormat.format(42), x, y, z, "D#517", f);
         break;
       default:
         writeBlock(gMotionModal.format(1), gFormat.format(40), x, y, z, f);
@@ -2995,16 +3230,22 @@ function onCommand(command) {
     onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
     return;
   case COMMAND_LOCK_MULTI_AXIS:
-    var code = parseInt(getProperty("rotaryAxesClampCodes"), 10) == 1 ? 131 : 21;
-    writeBlock(mClampModal.format(code));
+    //var code = parseInt(getProperty("rotaryAxesClampCodes"), 10) == 1 ? 131 : [21,23];
+    //writeBlock(mClampModal.format(code));
+    writeBlock(mFormat.format(21)); //lock 4th
+    writeBlock(mFormat.format(23)); //lock 5th
     return;
   case COMMAND_UNLOCK_MULTI_AXIS:
-    var code = parseInt(getProperty("rotaryAxesClampCodes"), 10) == 1 ? 132 : 22;
-    writeBlock(mClampModal.format(code));
+    //var code = parseInt(getProperty("rotaryAxesClampCodes"), 10) == 1 ? 132 : [22,24];
+    //writeBlock(mClampModal.format(code));
+  	writeBlock(mFormat.format(22)); //unlock 4th
+	  writeBlock(mFormat.format(24)); //unlock 5th
     return;
   case COMMAND_START_CHIP_TRANSPORT:
+    writeBlock(mFormat.format(15)); //using M15 coolant flush strart to start chip conveyor on Nara and Saga
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
+    writeBlock(mFormat.format(16)); //using M16 coolant flush stop to stop chip conveyor on Nara and Saga
     return;
   case COMMAND_BREAK_CONTROL:
     return;
@@ -3040,6 +3281,9 @@ function onSectionEnd() {
   }
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
+    if (getProperty("chipTransport") == "auto"){
+      onCommand(COMMAND_STOP_CHIP_TRANSPORT); //chip management stop if next section doesn't have coolant
+    }
   }
 
   if (true) {
@@ -3278,7 +3522,7 @@ function onRotateAxes(_x, _y, _z, _a, _b, _c) {
 function onReturnFromSafeRetractPosition(_x, _y, _z) {
   // reinstate TCP / tool length compensation
   if (!lengthCompensationActive) {
-    writeBlock(gFormat.format(getOffsetCode()), hFormat.format(tool.lengthOffset));
+    writeBlock(gFormat.format(getOffsetCode()), "H#517");
     lengthCompensationActive = true;
   }
 
@@ -3326,6 +3570,8 @@ function onClose() {
 
   onCommand(COMMAND_COOLANT_OFF);
 
+  onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop chip transport at end of program
+
   writeRetract(Z); // retract
 
   disableLengthCompensation(true);
@@ -3343,10 +3589,18 @@ function onClose() {
   }
 
   writeRetract(X, Y); // return to home
-
+  
+  if(properties.isPalletProgram){
+    writeBlock(mFormat.format(1)); // optional stop
+    writeBlock(mFormat.format(5)); // stop spindle
+    writeBlock(gFormat.format(65) + " P9901"); // return to start program
+    writeComment("Returning to main program 9901");
+  }
+  else{
   onImpliedCommand(COMMAND_END);
   onImpliedCommand(COMMAND_STOP_SPINDLE);
   writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
+  }
   if (subprograms.length > 0) {
     writeln("");
     write(subprograms);
