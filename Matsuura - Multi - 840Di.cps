@@ -1,19 +1,25 @@
 /**
-  Copyright (C) 2012-2022 by Autodesk, Inc.
-  All rights reserved.
 
-  Siemens SINUMERIK 840D post processor configuration.
+  Matsuura Siemens SINUMERIK 840D post processor configuration.
 
-  $Revision: 43980 fc70482ee2fa0f3f8331ea789e5a02be310463cb $
-  $Date: 2022-10-12 11:33:35 $
+  $Revision: 2 $
+  $Date: 2022-12-08 $
 
-  FORKID {75AF44EA-0A42-4803-8DE7-43BF08B352B3}
+  Conturo Prototyping Version Info
+
+  1 - 02/08/2022
+    -initial setup and testing
+
+  2 - 12/09/2022
+    -setup coolant codes based on M code list
+    -setup table clamp codes based on M code list (using M131 and M132)
+
 */
 
-description = "Siemens SINUMERIK 840D";
-vendor = "Siemens";
-vendorUrl = "http://www.siemens.com";
-legal = "Copyright (C) 2012-2022 by Autodesk, Inc.";
+description = "CP - Matsuura - Multi - Siemens 840D";
+vendor = "Matsuura";
+vendorUrl = "https://www.matsuura.co.jp/english/";
+legal = "Conturo Prototyping";
 certificationLevel = 2;
 minimumRevision = 45821;
 
@@ -181,7 +187,7 @@ properties = {
       {id:"54", title:"54 (BAC)"},
       {id:"192", title:"192 (Rotary angles)"}
     ],
-    value: "27",
+    value: "192",
     scope: "post"
   },
   cycle800SwivelDataRecord: {
@@ -229,6 +235,14 @@ properties = {
     type       : "boolean",
     value      : false,
     scope      : "post"
+  },
+  isPalletProgram: {
+    title      : "Automatic pallet changing",
+    description: "Set program for automatic pallet changing from a master program.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
   }
 };
 
@@ -249,14 +263,16 @@ var singleLineCoolant = false; // specifies to output multiple coolant codes in 
 var coolants = [
   {id:COOLANT_FLOOD, on:8},
   {id:COOLANT_MIST},
-  {id:COOLANT_THROUGH_TOOL},
-  {id:COOLANT_AIR},
-  {id:COOLANT_AIR_THROUGH_TOOL},
+  {id:COOLANT_THROUGH_TOOL, on:50}, //oil hole coolant start/TSC start/ HPC start (option)
+  {id:COOLANT_AIR, on:25, off:27}, //chip air blow per manual
+  {id:COOLANT_AIR_THROUGH_TOOL, on:52, off:53}, //spindle air blow per manual
   {id:COOLANT_SUCTION},
   {id:COOLANT_FLOOD_MIST},
   {id:COOLANT_FLOOD_THROUGH_TOOL},
   {id:COOLANT_OFF, off:9}
 ];
+
+var chipTransport = "auto" // auto - pass - on //options: auto=automatic(default)  pass=off but passthrough accepted  on=runs through the entire program
 
 var gFormat = createFormat({prefix:"G", decimals:0});
 var mFormat = createFormat({prefix:"M", decimals:0});
@@ -501,9 +517,9 @@ function getBodyLength(tool) {
 
 function defineMachine() {
   var useTCP = true;
-  if (false) { // note: setup your machine here
-    var aAxis = createAxis({coordinate:0, table:true, axis:[1, 0, 0], range:[-120, 120], preference:1, tcp:useTCP});
-    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360, 360], preference:0, tcp:useTCP});
+  if (true) { // note: setup your machine here
+    var aAxis = createAxis({coordinate:0, table:true, axis:[1, 0, 0], range:[-112, 12], preference:1, tcp:useTCP}); //Matsuura specs -110 to 10
+    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360, 0], preference:0, tcp:useTCP}); //full 360 movements
     machineConfiguration = new MachineConfiguration(aAxis, cAxis);
 
     setMachineConfiguration(machineConfiguration);
@@ -520,7 +536,7 @@ function defineMachine() {
     }
 
     // retract / reconfigure
-    var performRewinds = false; // set to true to enable the rewind/reconfigure logic
+    var performRewinds = true; // set to true to enable the rewind/reconfigure logic
     if (performRewinds) {
       machineConfiguration.enableMachineRewinds(); // enables the retract/reconfigure logic
       safeRetractDistance = (unit == IN) ? 1 : 25; // additional distance to retract out of stock, can be overridden with a property
@@ -590,9 +606,38 @@ function onOpen() {
   //   error(localize("Program name must begin with 2 letters."));
   // }
   writeln("; %_N_" + translateText(String(programName).toUpperCase(), " ", "_") + "_MPF");
+  
+  var jobdescription = (getGlobalParameter("job-description"))
+  if (jobdescription) {
+    writeComment(jobdescription);
+  }
 
-  if (programComment) {
-    writeComment(programComment);
+  // write test version
+  writeComment("test version")
+
+
+  // write user name	
+  if (hasGlobalParameter("username")) {
+    var usernameprint = getGlobalParameter("username");
+		  writeln("");
+		  writeComment("Username: " + usernameprint);
+		  }
+		  
+  // write date
+  var d = new Date();
+	if (hasGlobalParameter("generated-at")) {
+    var datetime = getGlobalParameter("generated-at");
+		  writeComment("Program Posted: " + d.toLocaleDateString() + " " + (d.toLocaleTimeString()));
+  }
+
+  // dump post properties  
+  if ((typeof getHeaderVersion == "function") && getHeaderVersion()) { 
+    writeComment(("Matsuura Siemen Factory 840D Post V") + getHeaderVersion()); 
+  }
+  writeln("")
+  writeComment("Chip management=" + chipTransport)
+  if(getProperty("isPalletProgram")){
+    writeComment("Auto pallet changing enabled")
   }
 
   // dump machine configuration
@@ -614,6 +659,7 @@ function onOpen() {
   }
 
   // dump tool information
+  writeln("")
   if (getProperty("writeTools")) {
     var zRanges = {};
     if (is3D()) {
@@ -1034,7 +1080,7 @@ function setWorkPlane(abc, turn) {
 
   if (turn) {
     //if (!currentSection.isMultiAxis()) {
-    onCommand(COMMAND_LOCK_MULTI_AXIS);
+    //onCommand(COMMAND_LOCK_MULTI_AXIS);
     //}
   }
 }
@@ -1371,7 +1417,7 @@ function onSection() {
     var comment = getParameter("operation-comment");
     if (comment && ((comment !== lastOperationComment) || !patternIsActive || insertToolCall)) {
       writeln("");
-      writeComment(comment);
+      writeComment(comment + " " + xyzFormat.format(tool.diameter) + " Dia");
       lastOperationComment = comment;
     } else if (!patternIsActive || insertToolCall) {
       writeln("");
@@ -1393,14 +1439,21 @@ function onSection() {
     }
   }
 
+  //optional stop at the beginning of every tool path -- on Matsuura this requires spindle and coolant to be turned back on in the program
+  if (!isFirstSection() && getProperty("optionalStop")) {  
+    onCommand(COMMAND_OPTIONAL_STOP);
+  }
+
   if (insertToolCall) {
     forceWorkPlane();
 
     setCoolant(COOLANT_OFF);
 
-    if (!isFirstSection() && getProperty("optionalStop")) {
+
+    if (!isFirstSection() && !getProperty("optionalStop") && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
+
 
     if (tool.number > 99999999) {
       warning(localize("Tool number exceeds maximum value."));
@@ -1482,7 +1535,8 @@ function onSection() {
        forceSpindleSpeed ||
        isFirstSection() ||
        (rpmFormat.areDifferent(spindleSpeed, sOutput.getCurrent())) ||
-       (tool.clockwise != getPreviousSection().getTool().clockwise))) {
+       (tool.clockwise != getPreviousSection().getTool().clockwise) || 
+       getProperty("optionalStop"))) {
     forceSpindleSpeed = false;
 
     if (tool.type == TOOL_PROBE) {
@@ -1613,6 +1667,14 @@ function onSection() {
     // currentCoolantMode = undefined;
   }
   setCoolant(tool.coolant);
+
+  if (tool.type != TOOL_PROBE) {
+    if(chipTransport == "auto"){      
+      if(tool.diameter >= .34){
+        onCommand(COMMAND_START_CHIP_TRANSPORT) //chip management commands flush and conveyor start
+      }
+    }
+  }
 
   if (getProperty("useParametricFeed") &&
       hasParameter("operation-strategy") &&
@@ -2707,12 +2769,16 @@ function onCommand(command) {
     onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
     return;
   case COMMAND_LOCK_MULTI_AXIS:
+    writeBlock(mFormat.format(131)); //lock 4th and 5th
     return;
   case COMMAND_UNLOCK_MULTI_AXIS:
+  	writeBlock(mFormat.format(132)); //unlock 4th and 5th
     return;
   case COMMAND_START_CHIP_TRANSPORT:
+    writeBlock(mFormat.format(15)); //cublex42 flush coolant  option
     return;
   case COMMAND_STOP_CHIP_TRANSPORT:
+    writeBlock(mFormat.format(16)); //cublex42 flush coolant option
     return;
   case COMMAND_BREAK_CONTROL:
     return;
@@ -2743,9 +2809,14 @@ function onSectionEnd() {
     }
     writeBlock(gFeedModeModal.format(94)); // inverse time feed off
   }
+
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
+    if (chipTransport == "auto" && ((getNextSection().getTool().diameter < .34) || (getNextSection().getTool().number != tool.number))){
+      onCommand(COMMAND_STOP_CHIP_TRANSPORT); //chip management stop if next section doesn't have coolant and tool diamter or number is different
+    }
   }
+
   writeBlock(gPlaneModal.format(17));
 
   if (true) {
@@ -2916,6 +2987,15 @@ function onClose() {
 
   if (getProperty("useParkPosition")) {
     writeRetract(X, Y);
+  }
+
+  onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop chip transport at end of program
+
+  if(getProperty("isPalletProgram")){
+    writeBlock(mFormat.format(1)); // optional stop
+    writeBlock(mFormat.format(5)); // stop spindle
+    writeBlock(gFormat.format(98)); // return to start program
+    writeComment("setup pallet swapping here");
   }
 
   onImpliedCommand(COMMAND_END);
