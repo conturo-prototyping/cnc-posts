@@ -2,46 +2,57 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 15  $
-  $Date:  $
+  $Revision: 18  $
+  $Date: 2022-11-02 $
 
   Hyundai Fanuc 18i-MB post processor configuration
-  1 - 5/10/2022 Billy @ CP 
+  1 - 5/10/2022 
+  Billy @ CP 
      -brought post in from fusion library started life as Fanuc Generic Mill post 43733
      -rewrote all discription stuff to match our current system
      -.nc file  extention removed
      -changed program title to be the title of the setup (jobdescription) in fusion instead of programcomment --around line 640
   
-  2 - 5/11/2022 Billy @ CP
+  2 - 5/11/2022 
+  Billy @ CP
      -setup B axis. unfortunatly work plane tilting isn't an option on this machine so we will have to work from the center of the tombstone
      -setup chip transport but haven't assigned an M-code yet
   
-  3 - 5/19/2022 Billy @ CP
+  3 - 5/19/2022 
+  Billy @ CP
       -setup chip transport for on/off from properties
   
-  4 - 5/20/2022 Billy @ CP
+  4 - 5/20/2022 
+  Billy @ CP
       -nixed chip transport until we can figure it out
 
-  5  - 5/20/2022 Billy@ CP
+  5  - 5/20/2022 
+  Billy@ CP
       -commented out X retract 5/20/22
 
-  6 - 6/9/2022 Billy
+  6 - 6/9/2022 
+  Billy
       -added coolant flush and jet logic
   
-  7 - 6/9/2022 Billy
+  7 - 6/9/2022 
+  Billy
       -removed coolant flush to try to get jet working only
 
-  8 - 6/10/2022 Billy
+  8 - 6/10/2022 
+  Billy
       - set max spindle speed to 15k
       - coolant flush with spindle cutting
   
-  9 - 6/10/2022 Billy
+  9 - 6/10/2022 
+  Billy
       - moved coolant flush to another line and made it a property that can be unchecked
 
-  10 - 6/13/2022 Billy
+  10 - 6/13/2022 
+  Billy
       - started work on high speed machining and smoothing logic to drive R value
   
-  11 - 6/22/2022 Billy
+  11 - 6/22/2022 
+  Billy
       - removed option for 8 digit program number
       - added program 5001 to list of programs reserved by tool builder
       - moved jet and flush to it's own logic (this isn't great yet. It calls every section, only needed if it's off)
@@ -54,24 +65,45 @@
               *z retract every time AICC R value is changed. might be unavoidable
               *jet and flush logic should probably be moved to a function that happens seporately, for now see "Coolant flush" for jet operation
   
-  12 - 7/5/2022 Billy
+  12 - 7/5/2022 
+  Billy
       - set maximum sequence number to 99999 and then restarts count
   
-  13 - 7/22/2022 Billy
+  13 - 7/22/2022 
+  Billy
       - added chip transport logic for off/on/auto
 
-  14 - 8/8/2022 Billy
+  14 - 8/8/2022 
+  Billy
       - rearranged some things
       - added a post properties dump at the top of the program
       - notated a few items
       - cleared up termanology
       - added chip screw shutoff at the end of every program
 
-  15 - 8/9/2022 Billy
-      - "mformat" mistake mixed
+  15 - 8/9/2022 
+  Billy
+      - "mformat" mistake fixed
       - cleaned up versioning format
       
+  16 - 9/8/2022
+  Billy @ CP
+      - typo in last description fixed
 
+  17 - 10/4/2022
+  Billy @ CP
+     - changed the way M1 works. Made it so it always happens at every tool change and the check box makes it happen between every tool path.
+
+  18 - 11/2/2022
+  Billy | tested by Justin
+     - always turn all coolant off so that flushing always stops if it's running on the last tool but other coolant isn't (added M9 at end of program)
+     - fixed last M37 that wasn't being output as a block
+     - added pallet swapping option includiing...
+       - changed formating to accept letter "O" file names / program numbers
+       - M30 to M99 with included shutdown for spindle and stuff
+       - notification at beginning of program and end of program
+     - slight formating changes to clean things up
+     
 
 
 
@@ -87,7 +119,7 @@ minimumRevision = 0;
 longDescription = "Hyudai 18i post built from generic Fanuc post by Conturo prototyping";
 
 extension = "";
-programNameIsInteger = true;
+programNameIsInteger = false;
 setCodePage("ascii");
 
 capabilities = CAPABILITY_MILLING | CAPABILITY_MACHINE_SIMULATION;
@@ -154,10 +186,18 @@ properties = {
   },
   optionalStop: {
     title      : "Optional stop",
-    description: "Outputs optional stop code during when necessary in the code.",
+    description: "Specifies that optional stops M1 should be output the biginning of every tool path. M1 will always be output at every tool change.",
     group      : "preferences",
     type       : "boolean",
     value      : true,
+    scope      : "post"
+  },
+  isPalletProgram: {
+    title      : "Automatic pallet changing",
+    description: "Changes the program output format to be used as a data server sub-program for automatic pallet changing from a master program.",
+    group      : "preferences",
+    type       : "boolean",
+    value      : false,
     scope      : "post"
   },
   separateWordsWithSpace: {
@@ -714,27 +754,64 @@ function onOpen() {
 
   if (programName) {
     var programId;
-    try {
-      programId = getAsInt(programName);
-    } catch (e) {
-      error(localize("Program name must be a number."));
-      return;
-    }
-    if (!((programId >= 1) && (programId <= 9999))) {
-      error(localize("Program number is out of range."));
-      return;
-    }    
-    if ((programId >= 8000) && (programId <= 9999) && (programId == 5001)) {
-      warning(localize("Program number is reserved by tool builder."));
-    }
-    oFormat = createFormat({width:(4), zeropad:true, decimals:0});
-    var jobdescription = (getGlobalParameter("job-description"))
-    if (jobdescription) {
-      writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
-    } else {
-      writeln("O" + oFormat.format(programId));
-    }
+    var splitNameNum = programName.match(/[0-9]+/g) //+|
+    var splitNameO = programName.match(/[a-zA-Z]+/g)
+    if(!getProperty("isPalletProgram")){
+      try {
+        programId = getAsInt(programName);
+      } catch (e) {
+          error(localize("Program name must be a number."));
+        return;
+      }
+      if (!((programId >= 1) && (programId <= 9999))) {
+          error(localize("Program number is out of range."));
+        return;
+      }    
+      if ((programId >= 8000) && (programId <= 9999) && (programId == 5001)) {
+        warning(localize("Program number is reserved by tool builder."));
+        return;
+      }
+      oFormat = createFormat({width:(4), zeropad:true, decimals:0});
+      var jobdescription = (getGlobalParameter("job-description"))
+      if (jobdescription) {
+        writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
+      } else {
+        writeln("O" + oFormat.format(programId));
+      }
     lastSubprogram = programId;
+    }
+    else {
+      try {
+        programId = getAsInt(splitNameNum);
+      } catch (e) {
+          error(localize("Program name must be a number."));
+        return;
+      }
+      if (!((programId >= 1) && (programId <= 9999))) {
+          error(localize("Program number is out of range."));
+        return;
+      }    
+      if ((programId >= 8000) && (programId <= 9999) && (programId == 5001)) { //error if number is a reserved HS400 program number
+        error(localize("Program number is reserved by tool builder."));
+        return;
+      }
+      if (String(splitNameO) === "null") { //error if name doesn't included letters
+        error(localize("enter O prefix into program name/number"));
+        return;
+      }
+      if (String(splitNameO) !== "O") { //error if name includes letters other than "O" in the first spot
+        error(localize("only O can be used a prefix for pallet programs"));
+        return;
+      }
+      oFormat = createFormat({width:(4), zeropad:true, decimals:0});
+      var jobdescription = (getGlobalParameter("job-description"))
+      if (jobdescription) {
+        writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
+      } else {
+        writeln("O" + oFormat.format(programId));
+      }
+    lastSubprogram = programId;
+    } 
   } else {
     error(localize("Program name has not been specified."));
     return;
@@ -754,8 +831,12 @@ function onOpen() {
 		  }
   
   // dump post properties  
-  writeComment("External chip conveyor=" + getProperty("chipTransport"))
-  writeComment("Flush Coolant=" + getProperty("coolantFlush"))
+  writeln("")
+  writeComment("External chip conveyor = " + getProperty("chipTransport"))
+  writeComment("Flush Coolant = " + getProperty("coolantFlush"))
+  if(getProperty("isPalletProgram")){
+    writeComment("Auto pallet changing enabled")
+  }
 
   // dump machine configuration
   var vendor = machineConfiguration.getVendor();
@@ -782,6 +863,7 @@ function onOpen() {
 
   // dump tool information
   if (getProperty("writeTools")) {
+    writeln("")
     var zRanges = {};
     if (is3D()) {
       var numberOfSections = getNumberOfSections();
@@ -1769,6 +1851,11 @@ function onSection() {
     }
   }
 
+  //optional stop at the beginning of every tool path
+  if (!isFirstSection() && getProperty("optionalStop")) {  
+    onCommand(COMMAND_OPTIONAL_STOP);
+  }
+
   if (insertToolCall || operationNeedsSafeStart) {
 
     if (!isFirstSection() && insertToolCall) {
@@ -1781,7 +1868,7 @@ function onSection() {
       }
     }
     
-    if (!isFirstSection() && getProperty("optionalStop") && insertToolCall) {
+    if (!isFirstSection() && !(getProperty("optionalStop")) && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
     }
     
@@ -3490,11 +3577,11 @@ function onClose() {
   writeln("");
   optionalSection = false;
 
-  onCommand(COMMAND_COOLANT_OFF);
+  writeBlock(mFormat.format(09)); //always turn all coolant off so that flushing always stops if it's running on the last tool but other coolant isn't
 
   onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop extrenal conveyor at end of program
 
-  writeln(mFormat.format(37)) //always stop chip screws at end of program
+  writeBlock(mFormat.format(37)) //always stop chip screws at end of program
 
   writeRetract(Z); // retract
 
@@ -3509,11 +3596,20 @@ function onClose() {
     writeBlock(gFormat.format(54.4), "P0");
   }
 
-  writeRetract(X/*, Y*/); //commented out X retract 5/20/22
+  writeRetract(X/*, Y*/); //commented out Y retract 5/20/22
 
   onImpliedCommand(COMMAND_END);
   onImpliedCommand(COMMAND_STOP_SPINDLE);
-  writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
+  if(getProperty("isPalletProgram")){
+    writeBlock(mFormat.format(01)); // optional stop
+    writeBlock(mFormat.format(05)); // stop spindle
+    writeBlock(mFormat.format(99)); // return to main program
+    writeComment("Returning to main program");
+  }
+  else{
+    writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
+  }
+  
   if (subprograms.length > 0) {
     writeln("");
     write(subprograms);
