@@ -71,6 +71,12 @@
     - ported Matsuura 5 axis post from fusion library V 44013
     - customized smoothing options using IPC R values, our machines might have MIMS P M F values but untested
 
+  13 - 12/9/2022
+    -replaced program comment with job description for the title of the program
+    -fixed pallet program end sequence
+    -revised chip management logic to post at the end of sections if the next section doesn't have it. This allows it to be turned on with passthrough between tool changes
+    -added tool diameter to the comment (title) of each section
+
 */
 
 description = "CP - Matsuura - Mill - Fanuc 30i";
@@ -742,6 +748,7 @@ function onOpen() {
 
   if (programName) {
     var programId;
+    var jobdescription = (getGlobalParameter("job-description")) //job description from file
     try {
       programId = getAsInt(programName);
     } catch (e) {
@@ -763,8 +770,8 @@ function onOpen() {
       warning(localize("Program number is reserved by tool builder."));
     }
     oFormat = createFormat({width:(getProperty("o8") ? 8 : 4), zeropad:true, decimals:0});
-    if (programComment) {
-      writeln("O" + oFormat.format(programId) + " (" + filterText(String(programComment).toUpperCase(), permittedCommentChars) + ")");
+    if (jobdescription) { //using job description instead of program comment
+      writeln("O" + oFormat.format(programId) + " (" + filterText(String(jobdescription).toUpperCase(), permittedCommentChars) + ")");
     } else {
       writeln("O" + oFormat.format(programId));
     }
@@ -1784,7 +1791,7 @@ function onSection() {
     var comment = getParameter("operation-comment");
     if (comment && ((comment !== lastOperationComment) || !patternIsActive || insertToolCall)) {
       writeln("");
-      writeComment(comment);
+      writeComment(comment + " " + xyzFormat.format(tool.diameter) + " Dia");
       lastOperationComment = comment;
     } else if (!patternIsActive || insertToolCall) {
       writeln("");
@@ -1825,11 +1832,6 @@ function onSection() {
     if (!isFirstSection() && insertToolCall) {
       forceWorkPlane();
       onCommand(COMMAND_COOLANT_OFF);
-    }
-    if (getProperty("chipTransport") == "auto" || "pass") {
-      if (!isFirstSection() && insertToolCall) {
-        onCommand(COMMAND_STOP_CHIP_TRANSPORT);
-      }
     }
     if (!isFirstSection() && !getProperty("optionalStop") && insertToolCall) {
       onCommand(COMMAND_OPTIONAL_STOP);
@@ -3281,8 +3283,9 @@ function onSectionEnd() {
   }
   if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
     setCoolant(COOLANT_OFF);
-    if (getProperty("chipTransport") == "auto"){
-      onCommand(COMMAND_STOP_CHIP_TRANSPORT); //chip management stop if next section doesn't have coolant
+    if (getProperty("chipTransport") == "auto"  && 
+    (((getNextSection().getTool().diameter < .34) && (tool.diameter >=.34)) || (getNextSection().getTool().number != tool.number))){
+      onCommand(COMMAND_STOP_CHIP_TRANSPORT); //chip management stop if next section doesn't have coolant and tool diamter or number is different
     }
   }
 
@@ -3590,7 +3593,7 @@ function onClose() {
 
   writeRetract(X, Y); // return to home
   
-  if(properties.isPalletProgram){
+  if(getProperty("isPalletProgram")){
     writeBlock(mFormat.format(1)); // optional stop
     writeBlock(mFormat.format(5)); // stop spindle
     writeBlock(gFormat.format(65) + " P9901"); // return to start program
