@@ -4,7 +4,7 @@
 
   FANUC post processor configuration.
 
-  $Revision: 12 $
+  $Revision: 13 $
   $Date: 2022-10-27 $
 
 
