@@ -2,8 +2,8 @@
    
   Hyundai Fanuc 18i post processor
 
-  $Revision: 18  $
-  $Date: 2022-11-02 $
+  $Revision: 19  $
+  $Date: 2022-12-15 $
 
   Hyundai Fanuc 18i-MB post processor configuration
   1 - 5/10/2022 
@@ -103,6 +103,11 @@
        - M30 to M99 with included shutdown for spindle and stuff
        - notification at beginning of program and end of program
      - slight formating changes to clean things up
+
+  19 - 12/15/2022
+    -chip breaking doesn't do pecking reduction, make all chip breaking wiht peck reduction run without cycle
+    -deep drilling doesn't do pecking reduction, make all deep drilling with peck reduction run without cycle
+    -syntax repairs
      
 
 
@@ -2313,7 +2318,7 @@ function onCyclePoint(x, y, z) {
       }
       break;
     case "chip-breaking":
-      if ((cycle.accumulatedDepth < cycle.depth) || (P > 0)) {
+      if ((cycle.accumulatedDepth < cycle.depth) || (P > 0) || (cycle.incrementalDepthReduction > 0)) {
         expandCyclePoint(x, y, z);
       } else {
         writeBlock(
@@ -2325,7 +2330,7 @@ function onCyclePoint(x, y, z) {
       }
       break;
     case "deep-drilling":
-      if (P > 0) {
+      if (P > 0 || (cycle.incrementalDepthReduction > 0)) {
         expandCyclePoint(x, y, z);
       } else {
         writeBlock(
@@ -3569,19 +3574,19 @@ function onClose() {
     if (typeof inspectionProcessSectionEnd == "function") {
       inspectionProcessSectionEnd();
     }
-  }
+  };
 
   if (probeVariables.probeAngleMethod == "G68") {
     cancelWorkPlane();
-  }
+  };
   writeln("");
   optionalSection = false;
 
-  writeBlock(mFormat.format(09)); //always turn all coolant off so that flushing always stops if it's running on the last tool but other coolant isn't
+  writeBlock(mFormat.format(9)); //always turn all coolant off so that flushing always stops if it's running on the last tool but other coolant isn't
 
   onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop extrenal conveyor at end of program
 
-  writeBlock(mFormat.format(37)) //always stop chip screws at end of program
+  writeBlock(mFormat.format(37)); //always stop chip screws at end of program
 
   writeRetract(Z); // retract
 
@@ -3594,21 +3599,21 @@ function onClose() {
 
   if (probeVariables.probeAngleMethod == "G54.4") {
     writeBlock(gFormat.format(54.4), "P0");
-  }
+  };
 
   writeRetract(X/*, Y*/); //commented out Y retract 5/20/22
 
   onImpliedCommand(COMMAND_END);
   onImpliedCommand(COMMAND_STOP_SPINDLE);
   if(getProperty("isPalletProgram")){
-    writeBlock(mFormat.format(01)); // optional stop
-    writeBlock(mFormat.format(05)); // stop spindle
+    writeBlock(mFormat.format(1)); // optional stop
+    writeBlock(mFormat.format(5)); // stop spindle
     writeBlock(mFormat.format(99)); // return to main program
     writeComment("Returning to main program");
   }
   else{
     writeBlock(mFormat.format(30)); // stop program, spindle stop, coolant off
-  }
+  };
   
   if (subprograms.length > 0) {
     writeln("");
