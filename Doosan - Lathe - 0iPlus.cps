@@ -4,7 +4,7 @@
 
   Doosan Lathe post processor configuration.
 
-  $Revision: 9 $ 
+  $Revision: 10 $ 
 */ 
 
 
@@ -40,7 +40,10 @@ V1.8 added Adc 4-14-2022
 
 V1.9 Added Adc 4-28-2022
   -changed auto on command for chip transport M24 on startup. should only work if "got chip conveyer" is true
-  
+
+V2.0 Added Adc 2-17-2023
+  -added dwell on each feed peck in the G83 expanded cycle. set to execute after feed motion 
+  and before rapid out. only if cycle type is deep-drilling and dwell is selected.
   
 */
 
@@ -648,9 +651,9 @@ function onOpen() {
         d.toLocaleDateString() + ' ' +
         hrs_12 + ':' + m + ' ' + pm_am
     )
-    ;
+  
      // writeComment('Posted: ' + new Date().toLocaleString()
-   // )
+    //)
   }  
 
   if ((getNumberOfSections() > 0) && (getSection(0).workOffset == 0)) {
@@ -1214,6 +1217,7 @@ function onRapid(_x, _y, _z) {
   if (threadNumber > 0 && getProperty("useSimpleThread")) {
     return;
   }
+
   var x = xOutput.format(_x);
   var y = yOutput.format(_y);
   var z = zOutput.format(_z);
@@ -1255,6 +1259,7 @@ function onLinear(_x, _y, _z, feed) {
     resetFeed = false;
     forceFeed();
   }
+  
   var x = xOutput.format(_x);
   var y = yOutput.format(_y);
   var z = zOutput.format(_z);
@@ -1276,6 +1281,15 @@ function onLinear(_x, _y, _z, feed) {
     } else {
       writeBlock(gMotionModal.format(isSpeedFeedSynchronizationActive() ? 32 : 1), x, y, z, f);
     }
+
+    //added  dwell after feed in deep-drill cycle Adc 1-9-2023
+    
+    var P = (!cycle || !cycle.dwell) ? 0 : cycle.dwell;
+    if (P > 0 && cycleExpanded && cycleType == "deep-drilling") {
+      onDwell(P);
+    //writeComment("dwell here");
+    }//end edit for dwell here
+
   } else if (f) {
     if (getNextRecord().isMotion()) { // try not to output feed without motion
       forceFeed(); // force feed on next line
@@ -1596,13 +1610,15 @@ function onCyclePoint(x, y, z) {
       break;
     case "deep-drilling":
       if (P > 0) {
+        //writeComment("testing_drill_start");//added here 1-6-23
         expandCyclePoint(x, y, z);
+        //writeComment("testing_drill_end");//added here 1-6-23
       } else {
         writeBlock(
           conditional(getProperty("type") != "A", gAbsIncModal.format(90)), conditional(getProperty("type") != "A", gRetractModal.format(98)), gCycleModal.format(83),
           getCommonCycle(x, y, z, cycle.retract),
           peckOutput.format(cycle.incrementalDepth),
-          // conditional(P > 0, "P" + milliFormat.format(P)),
+          //conditional(P > 0, "P" + milliFormat.format(P)),
           feedOutput.format(F)
         );
       }

@@ -4,12 +4,10 @@
 
   HAAS Lathe post processor configuration.
 
-  $Revision: 4 $
+  $Revision: 5 $
 
 V1 added adc 3-28-2022
-- orginal fusion 360 post 43699
-
-
+  - orginal fusion 360 post 43699
 
 V2 added adc 3-28-2021
   -added username date&time
@@ -23,6 +21,12 @@ V4 Changed adc 3-29-2022
   -added button for "has y axis"
   -defined gotyaxis = property of "has Y axis " button
   -changed funtion of got live tool to elimante Y axis output
+
+V5 Changerd adc 2-16-2023
+  -Added dwell before retact on deep drilling cycle  
+  
+  //STILL NEED TO FIX Z MIN OUTPUT FOR TOOLS, WHEN MILLING IS ACTIVE
+
 */
 
 description = "CP - Haas - Lathe - All";
@@ -2763,6 +2767,14 @@ function onLinear(_x, _y, _z, feed) {
     } else {
       writeBlock(gMotionModal.format(isSpeedFeedSynchronizationActive() ? 32 : 1), x, y, z, f);
     }
+    //added  dwell after feed in deep-drill cycle Adc 1-9-2023
+    
+    var P = (!cycle || !cycle.dwell) ? 0 : cycle.dwell;
+    if (P > 0 && cycleExpanded && cycleType == "deep-drilling") {
+      onDwell(P);
+    //writeComment("dwell here");
+    }//end edit for dwell here
+    
   } else if (f) {
     if (getNextRecord().isMotion()) { // try not to output feed without motion
       forceFeed(); // force feed on next line
@@ -3681,7 +3693,7 @@ function onCyclePoint(x, y, z) {
       break;
     case "chip-breaking":
     case "deep-drilling":
-      if (cycleType == "chip-breaking" && (cycle.accumulatedDepth < cycle.depth)) {
+      if (cycleType == "chip-breaking" && (cycle.accumulatedDepth < cycle.depth) || (P > 0)) {
         expandCyclePoint(x, y, z);
         return;
       } else {
