@@ -48,7 +48,7 @@ V2.0 Added Adc 2-17-2023
 */
 
 
-description = "CP - Doosan - Lathe - 0i-Plus - Beta";
+description = "CP - Doosan - Lathe - 0i-Plus";
 vendor = "Doosan";
 vendorUrl = "https://www.doosanmachinetools.com";
 
