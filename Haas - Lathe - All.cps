@@ -32,7 +32,7 @@ V6 Changed adc 4-5-2023
     -G187: true
     -Use G2/G3 for G112; true
     -Y Axis drilling: true
-    -X Axis = -3.0 inch  
+    -X Axis = -3.0 inch
 
 
   //STILL NEED TO FIX Z MIN OUTPUT FOR TOOLS, WHEN MILLING IS ACTIVE
