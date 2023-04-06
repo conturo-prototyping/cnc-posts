@@ -4,7 +4,7 @@
 
   HAAS Lathe post processor configuration.
 
-  $Revision: 5 $
+  $Revision: 6 $
 
 V1 added adc 3-28-2022
   - orginal fusion 360 post 43699
@@ -24,7 +24,17 @@ V4 Changed adc 3-29-2022
 
 V5 Changerd adc 2-16-2023
   -Added dwell before retact on deep drilling cycle  
-  
+
+V6 Changed adc 4-5-2023  
+  -Changed default conditions for mill-turn
+    -G0 Rewind: true
+    -Use G112: true
+    -G187: true
+    -Use G2/G3 for G112; true
+    -Y Axis drilling: true
+    -X Axis = -3.0 inch
+
+
   //STILL NEED TO FIX Z MIN OUTPUT FOR TOOLS, WHEN MILLING IS ACTIVE
 
 */
@@ -271,7 +281,7 @@ properties = {
       "If disabled, the postprocessor will calculate and output XZC coordinates.",
     group: "millturn",
     type : "boolean",
-    value: false,
+    value: true,
     scope: "post"
   },
   usePolarCircular: {
@@ -279,7 +289,7 @@ properties = {
     description: "Enables circular interpolation output while using G112 polar mode.",
     group      : "millturn",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   xAxisMinimum: {
@@ -288,7 +298,7 @@ properties = {
     group      : "millturn",
     type       : "spatial",
     range      : [0, -99999],
-    value      : 0,
+    value      : -3.0,
     scope      : "post"
   },
   useG61: {
@@ -313,7 +323,7 @@ properties = {
     description: "Uses G0 moves for rewinding of the C-axis.",
     group      : "millturn",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   useSSV: {
@@ -403,7 +413,7 @@ properties = {
     description: "Positions in Y for axial drilling options when it can instead of using the C-axis.",
     group      : "millturn",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   useG187: {
@@ -411,7 +421,7 @@ properties = {
     description: "Specifies that smoothing using G187 should be used for milling operations.",
     group      : "millturn",
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   }
 };
