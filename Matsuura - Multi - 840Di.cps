@@ -2,8 +2,8 @@
 
   Matsuura Siemens SINUMERIK 840Di post processor configuration.
 
-  $Revision: 37 $
-  $Date: 2023-08-09 $
+  $Revision: 39 $
+  $Date: 2023-08-11 $
 
   Conturo Prototyping Version Info
 
@@ -125,6 +125,13 @@
     -changed pallet logic to output a master program and rename this as a subprogram
     -elevated to non-test version for justin even though there are some things to workout still
     -cleaned up unused post parameters
+
+  38 - 8-11-2023 - Billy
+    - excluded drilling and tapping cycles from chip managament to avoid cycling the pumps a bunch of times
+  
+  39 - Billy
+    - removed redudent chip transport (M15) calls when M1 between tool paths are disabled. This was causing the machine to alarm, can't figure out why though.
+    
     
 
 
@@ -1844,11 +1851,15 @@ function onSection() {
   setCoolant(tool.coolant);
 
 
-
-  if (tool.type != TOOL_PROBE) {
-    if(chipTransport == "auto"){      
-      if(tool.diameter >= .34){
-        onCommand(COMMAND_START_CHIP_TRANSPORT) //chip management commands flush and conveyor start
+  if (insertToolCall || getProperty("optionalStop")) {
+    if (tool.type != TOOL_PROBE) {
+      if(chipTransport == "auto"){      
+        if ( //operations to exculde from running chip management
+          (getParameter("operation-strategy") != "drill") &&
+          (getParameter("operation-strategy") != "thread") &&
+          (tool.diameter >= .34)){
+           onCommand(COMMAND_START_CHIP_TRANSPORT) //chip management commands flush and conveyor start
+        }
       }
     }
   }
@@ -3166,11 +3177,18 @@ function onSectionEnd() {
     };
   }
 
+  //chip transport stop
+  if (!isLastSection()) { //not the last section
+
+    if (chipTransport == "auto" && //auto mode
+        getNextSection().getTool().number != tool.number && //current tool not same as next tool and
+        getParameter("operation-strategy") != "drill" && //current strategy is not a drill and and
+        getParameter("operation-strategy") != "thread" &&  //current strategy is not thread milling and
+        tool.diameter >= .34)
+        {
+            onCommand(COMMAND_STOP_CHIP_TRANSPORT); 
+        }
   
-  if (!isLastSection() && (getNextSection().getTool().coolant != tool.coolant)) {
-    if (chipTransport == "auto" && ((getNextSection().getTool().diameter < .34) || (getNextSection().getTool().number != tool.number))){
-      onCommand(COMMAND_STOP_CHIP_TRANSPORT); //chip management stop if next section doesn't have coolant and tool diamter or number is different
-    }
   }
 
 
