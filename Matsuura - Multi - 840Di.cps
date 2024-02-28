@@ -2,8 +2,8 @@
 
   Matsuura Siemens SINUMERIK 840Di post processor configuration.
 
-  $Revision: 39 $
-  $Date: 2023-08-11 $
+  $Revision: 48 $
+  $Date: 2023-12-06 $
 
   Conturo Prototyping Version Info
 
@@ -127,13 +127,37 @@
     -cleaned up unused post parameters
 
   38 - 8-11-2023 - Billy
-    - excluded drilling and tapping cycles from chip managament to avoid cycling the pumps a bunch of times
+    - excluded drilling and tapping cycles from chip managament to avoid cycles the pumps a bunch of times
   
   39 - Billy
     - removed redudent chip transport (M15) calls when M1 between tool paths are disabled. This was causing the machine to alarm, can't figure out why though.
     
-    
+  40 - 11-29-2023 - Billy
+    - TSA sequence changed to match TSC
 
+  41 - 11-30-2023 - Billy
+    - TRAORI setup for the most part, needs to be tested more thoroughly by Justin
+  
+  42 - Billy
+    - Removed M1 before Traori
+  
+  43 - Billy
+   - Removed rewind for C axis
+
+  44 - 12-6-2023 - Billy
+   - Added A and C brakes at end of program
+
+  45 - Billy
+   - inverted the c axis
+
+  46 - Billy
+   - added full safe position at beginning of program
+
+  47 - Billy
+   - messing around with rotary directions to try to get it right for our machine
+  
+  48 - 12-11-2023 - Billy
+   - added arguments to TRAORI for oriention
 
   
 
@@ -166,7 +190,7 @@ allowHelicalMoves = true;
 allowedCircularPlanes = undefined; // undefined = allow any circular motion, 0 = don't allow any circular motion
 
 var tv = false; //test version
-var notes = "-- TRAORI isn't working yet. See Google drive doc for smoothing settings"; //test version notes
+var notes = "-- TRAORI is in the testing phase. See Google drive doc for smoothing settings"; //test version notes
 
 // user-defined properties
 properties = {
@@ -682,8 +706,8 @@ function getBodyLength(tool) {
 function defineMachine() {
   var useTCP = true;
   if (true) { // note: setup your machine here
-    var aAxis = createAxis({coordinate:0, table:true, axis:[1, 0, 0], range:[-112, 12], preference:1, tcp:useTCP}); //Matsuura specs -110 to 10
-    var cAxis = createAxis({coordinate:2, table:true, axis:[0, 0, 1], range:[-360, 0], preference:0, tcp:useTCP}); //full 360 movements
+    var aAxis = createAxis({coordinate:X, table:true, axis:[-1, 0, 0], range:[-111, 10], preference:-1, tcp:useTCP}); //Matsuura specs -110 to 10
+    var cAxis = createAxis({coordinate:Z, table:true, axis:[0, 0, 1], range:[0, 360], preference:1, tcp:useTCP, cyclic:true}); //full 360 movements
     machineConfiguration = new MachineConfiguration(aAxis, cAxis);
 
     setMachineConfiguration(machineConfiguration);
@@ -937,7 +961,7 @@ function forceAny() {
 }
 
 function setWCS() {
-  if (currentSection.workOffset != currentWorkOffset) {
+  if (currentSection.workOffset != currentWorkOffset || (currentSection.isMultiAxis())) {
     writeBlock(currentSection.wcs);
     currentWorkOffset = currentSection.workOffset;
   }
@@ -1557,9 +1581,7 @@ function onSection() {
 
     // retract to safe plane
     writeRetract(Z);
-    if(!isFirstSection()){
-      writeRetract(X,Y);
-    };
+    writeRetract(X,Y);
     writeBlock("CYCLE800()"); //cancel cycle800
 
     if (newWorkPlane && useMultiAxisFeatures) {
@@ -1571,7 +1593,8 @@ function onSection() {
     var comment = getParameter("operation-comment");
     if (comment && ((comment !== lastOperationComment) || !patternIsActive || insertToolCall)) {
       writeln("");
-      writeComment(comment + " " + xyzFormat.format(tool.diameter) + " Dia");
+      writeComment(comment + " " + xyzFormat.format(tool.diameter) + " Dia"); 
+      writeBlock("MSG ("  + "\"" + comment + "\"" + ")");
       lastOperationComment = comment;
     } else if (!patternIsActive || insertToolCall) {
       writeln("");
@@ -1664,8 +1687,11 @@ function onSection() {
     }
   }
 
-  
-  if((tool.coolant) == "3" || (tool.coolant) == "8"){
+  //writeComment(tool.coolant) debug coolant
+  // 3 = TSC
+  // 8 = TSC + Flood
+  // 5 = TSA
+  if((tool.coolant) == "3" || (tool.coolant) == "8" || (tool.coolant) == "5"){
     setCoolant(tool.coolant);
     //writeBlock(gFormat.format(4), "P5000")
     //writeComment("dwell 5 seconds for TSC to ramp up"); //debug coolant
@@ -1706,15 +1732,17 @@ function onSection() {
     // currentCoolantMode = undefined;
   }
   
-  if((tool.coolant) != "3" && (tool.coolant) != "8"){
+  if((tool.coolant) != "3" && (tool.coolant) != "8" && (tool.coolant) != "5"){
     setCoolant(tool.coolant);
-  }; //all coolants other than TSC start after spindle
+  }; //all coolants other than TSC and TSA start after spindle
 
   // wcs
   if (insertToolCall) { // force work offset when changing tool
     currentWorkOffset = undefined;
   }
-  setWCS();
+  if (!currentSection.isMultiAxis()) {
+    setWCS();
+  }; //if section is multiaxis WCS will be set in multiaxis section
 
   forceXYZ();
 
@@ -1745,15 +1773,17 @@ function onSection() {
       if (!retracted) {
         writeRetract(Z);
       }
+      onCommand(COMMAND_UNLOCK_MULTI_AXIS);
       var abc = currentSection.getInitialToolAxisABC();
       writeBlock(gAbsIncModal.format(90), gMotionModal.format(0), aOutput.format(abc.x), bOutput.format(abc.y), cOutput.format(abc.z));
       setCurrentDirection(abc); //added to new fusion post version -Billy
     }
     if (operationSupportsTCP || !machineConfiguration.isMultiAxisConfiguration()) {
-      onCommand(COMMAND_OPTIONAL_STOP); //M0 before full 5 axis to check
-      writeBlock("TRAORI");
+      writeBlock("TRAORI(,0,0,1)"); //orient c normal after preposition
     }
     var initialPosition = getFramePosition(currentSection.getInitialPosition());
+
+    setWCS()
 
     if (currentSection.isOptimizedForMachine()) {
       writeBlock(
@@ -1765,12 +1795,7 @@ function onSection() {
       );
     } else {
       var d = currentSection.getGlobalInitialToolAxis();
-      writeBlock(
-        gMotionModal.format(0),
-        //gFormat.format(getOffsetCode()),
-        zOutput.format(initialPosition.z)//,
-        //"H" + toolFormat.format(tool.number)
-      );
+
       writeBlock(
         gAbsIncModal.format(90),
         gMotionModal.format(0),
@@ -1864,7 +1889,7 @@ function onSection() {
     }
   }
 
-    /*//Matsuura spindle rampup function spindle check
+    /*//Matsuura spindle ramp-up function spindle check
   if ((insertToolCall ||
     forceSpindleSpeed ||
     isFirstSection() ||
@@ -3150,6 +3175,7 @@ function onSectionEnd() {
     if (operationSupportsTCP || !machineConfiguration.isMultiAxisConfiguration()) {
       writeBlock("TRAFOOF");
       forceWorkPlane();
+      onCommand(COMMAND_LOCK_MULTI_AXIS);
     }
     writeBlock(gFeedModeModal.format(94)); // inverse time feed off
   }
@@ -3162,15 +3188,15 @@ function onSectionEnd() {
   if (isLastSection()) {    
     writeBlock(mFormat.format(5)); //spindle stop if last section
     setCoolant(COOLANT_OFF); //coolant off if last section
-    if((tool.coolant) == "3" || (tool.coolant) == "8"){
+    if((tool.coolant) == "3" || (tool.coolant) == "8" || (tool.coolant) == "5"){
       //writeBlock(gFormat.format(4), "P3000")
-      writeComment("TSC shutoff sequence can be added here")
+      writeComment("TSC or TSA shutoff sequence can be added here")
     };
   }else{
     if(getNextSection().getTool().number != tool.number){
         writeBlock(mFormat.format(5)); //spindle stop if next tool is different than current tool
         setCoolant(COOLANT_OFF); //coolant off if next tool is differnet than current tool (tool change coming up)
-        if((tool.coolant) == "3" || (tool.coolant) == "8"){
+        if((tool.coolant) == "3" || (tool.coolant) == "8" || (tool.coolant) == "5"){
           //writeBlock(gFormat.format(4), "P3000")
           writeComment("TSC shutoff sequence can be added here")
         }
@@ -3392,8 +3418,10 @@ function onClose() {
 
   if (getProperty("useParkPosition")) {
     writeBlock(gFormat.format(91), gFormat.format(30), xOutput.format(0), yOutput.format(0), "P2", " ; PALLET READY TO CHANGE");
+    writeBlock("MSG ("  + "\"" + "PALLET READY TO CHANGE" + "\"" + ")");
   }
 
+  onCommand(COMMAND_LOCK_MULTI_AXIS); //always lock the brakes at the end of the program
   onCommand(COMMAND_STOP_CHIP_TRANSPORT); //always stop chip transport at end of program
 
   if(getProperty("isPalletProgram")){
