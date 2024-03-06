@@ -2,8 +2,8 @@
 
   Matsuura Siemens SINUMERIK 840Di post processor configuration.
 
-  $Revision: 48 $
-  $Date: 2023-12-06 $
+  $Revision: 49 $
+  $Date: 2024-02-06 $
 
   Conturo Prototyping Version Info
 
@@ -158,6 +158,9 @@
   
   48 - 12-11-2023 - Billy
    - added arguments to TRAORI for oriention
+
+  40 - 03-06-2024 - Billy
+   - force decemal for all rotary moves
 
   
 
@@ -435,7 +438,7 @@ var dFormat = createFormat({prefix:"D", decimals:0});
 var nFormat = createFormat({prefix:"N", decimals:0});
 
 var xyzFormat = createFormat({decimals:(unit == MM ? 3 : 4), forceDecimal:true});
-var abcFormat = createFormat({decimals:3, scale:DEG});
+var abcFormat = createFormat({decimals:3, scale:DEG, forceDecimal:true});
 var abcDirectFormat = createFormat({decimals:3, scale:DEG, prefix:"=DC(", suffix:")"});
 var abc3Format = createFormat({decimals:6});
 var feedFormat = createFormat({decimals:(unit == MM ? 1 : 2), forceDecimal:true});
